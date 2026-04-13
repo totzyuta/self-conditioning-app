@@ -318,7 +318,7 @@ function todayISO() {
 }
 
 /* ═══ Smooth SVG Line Chart ══════════════════════════════ */
-function SmoothLineChart({ points, w = 640, h = 130, showNeutral = true, color = "#2D5A27" }) {
+function SmoothLineChart({ points, w = 640, h = 130, showNeutral = true, showDateLabels = false, color = "#2D5A27" }) {
   const [hovered, setHovered] = useState(null); // index of hovered point
   const svgRef = useRef(null);
 
