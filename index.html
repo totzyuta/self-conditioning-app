@@ -84,6 +84,9 @@
 <script type="text/babel">
 const { useState, useEffect, useCallback, useMemo, useRef } = React;
 
+/* ═══ App Version ═══════════════════════════════════════  */
+const APP_VERSION = "v1.0.0";
+
 /* ═══ Storage ═══════════════════════════════════════════ */
 const SK     = "phl_tracker_v1";
 const AUTH_K = "phl_auth_v1";
@@ -1323,7 +1326,7 @@ function App() {
         borderTop: "1px solid var(--border)",
         fontSize: 9, color: "#D0CDC5", letterSpacing: ".15em",
       }}>
-        SELF CONDITIONING APP  ·  OS SYSTEM  5.0 NEUTRAL
+        SELF CONDITIONING APP  ·  {APP_VERSION}
       </footer>
     </div>
   );
