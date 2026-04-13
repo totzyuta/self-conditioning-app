@@ -1,0 +1,1061 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Self Conditioning App</title>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --bg: #F9F8F4; --surface: #FFFFFF;
+      --green: #2D5A27; --green-dim: #EAF2E9;
+      --terra: #C4613A; --terra-dim: #FBF0EB;
+      --text: #1C1C1A; --muted: #9B9890; --border: #E4E1D8;
+    }
+    body {
+      background: var(--bg);
+      font-family: 'Hiragino Sans','Hiragino Kaku Gothic ProN','Yu Gothic Medium',
+                   'Noto Sans JP',-apple-system,sans-serif;
+      color: var(--text); min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+    input[type="range"] {
+      -webkit-appearance: none; width: 100%; height: 3px;
+      border-radius: 2px; outline: none; cursor: pointer;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none; width: 22px; height: 22px; border-radius: 50%;
+      background: var(--green); border: 3px solid var(--bg);
+      box-shadow: 0 0 0 1.5px var(--green),0 2px 6px rgba(0,0,0,.15);
+      cursor: grab; transition: transform .18s,box-shadow .18s;
+    }
+    input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.15); }
+    input[type="date"],input[type="text"],textarea,select {
+      width: 100%; border: 1px solid var(--border); background: var(--surface);
+      padding: 10px 14px; font-size: 13px; font-family: inherit;
+      color: var(--text); border-radius: 6px; outline: none;
+      transition: border-color .2s,box-shadow .2s;
+    }
+    input[type="date"]:focus,input[type="text"]:focus,textarea:focus,select:focus {
+      border-color: var(--green); box-shadow: 0 0 0 3px rgba(45,90,39,.08);
+    }
+    textarea { resize: vertical; min-height: 72px; line-height: 1.65; }
+    table { width: 100%; border-collapse: collapse; }
+    th {
+      font-size: 10px; font-weight: 500; letter-spacing: .1em; color: var(--muted);
+      text-transform: uppercase; padding: 10px 12px; text-align: left;
+      border-bottom: 1px solid var(--border); white-space: nowrap;
+    }
+    td { padding: 12px 12px; font-size: 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    tr:last-child td { border-bottom: none; }
+    tbody tr { transition: background .15s; }
+    tbody tr:hover td { background: rgba(45,90,39,.025); }
+    @keyframes fadeUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+    @keyframes rowIn  { from{opacity:0;transform:translateX(-5px)} to{opacity:1;transform:translateX(0)} }
+    .fade-up { animation: fadeUp .4s cubic-bezier(.22,1,.36,1) both; }
+    button { cursor: pointer; font-family: inherit; }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useCallback, useMemo, useRef } = React;
+
+/* ═══ Storage ═══════════════════════════════════════════ */
+const SK = "phl_tracker_v1";
+
+/* ═══ Seed Data ═════════════════════════════════════════ */
+const SEED_RAW = [
+  {"date":"2026-02-14","condition":null,"mainWorkout":"プロジェクト設定","weightRepSet":"—","subWorkout":"—","remarks":"トレーニングノートの出力ルールを「2週間分の表形式 / コンディション・重量・回数・セット項目」に固定することを決定。Body Beauty Project本格始動。"},
+  {"date":"2026-02-23","condition":null,"mainWorkout":"SQ (スクワット)","weightRepSet":"52.5kg / PB更新","subWorkout":"コンパウンド種目中心","remarks":"スクワットで自己ベストを更新。2月中旬から下旬にかけて45kgから52.5kgまで重量を伸ばすことに成功。"},
+  {"date":"2026-02-26","condition":null,"mainWorkout":"ディロード開始","weightRepSet":"—","subWorkout":"ダンベル種目中心","remarks":"中枢神経系の疲労を感じたため、強度を落としたディロード期間へ移行。技術練習と回復を優先。"},
+  {"date":"2026-02-27","condition":null,"mainWorkout":"DBP / DF","weightRepSet":"DBP 8kg (10*3) / DF 8kg (10*3)","subWorkout":"技術練習","remarks":"低負荷のダンベル種目で胸の収縮を確認。肩や手首の違和感に対応。"},
+  {"date":"2026-02-28","condition":null,"mainWorkout":"Active Recovery","weightRepSet":"8,000-10,000 steps","subWorkout":"Walking","remarks":"神経系回復のためのウォーキング。グリップ調整などの技術的な確認のみ実施。"},
+  {"date":"2026-03-03","condition":null,"mainWorkout":"IDC / サイドレイズ","weightRepSet":"IDC 8kg (10*3) / SR 7kg (10*3)","subWorkout":"なし","remarks":"ジム復帰初日。「握らない」意識でリハビリ。左腕に顕著な疲労の左右差（デバッグが必要）。"},
+  {"date":"2026-03-07","condition":null,"mainWorkout":"完全休息","weightRepSet":"—","subWorkout":"—","remarks":"休み切りフェーズ。身体の信号を優先し、リカバリーに専念。"},
+  {"date":"2026-03-11","condition":4.5,"mainWorkout":"休息","weightRepSet":"—","subWorkout":"—","remarks":"ニュートラル（5.0）まであと一息。翌日3/12からの本格再開に向けてOSを安定させる。"},
+  {"date":"2026-03-12","condition":4.8,"mainWorkout":"BP (ベンチプレス)","weightRepSet":"40kg / (10, 10, 9) / 3s","subWorkout":"BB-Curl 20kg (7,7,6)","remarks":"かなり久しぶりのトレーニング。やっとやっと、回復して来た気がする。ベンチプレスで、かなり回復。"},
+  {"date":"2026-03-13","condition":5.2,"mainWorkout":"休息","weightRepSet":"—","subWorkout":"—","remarks":"5の大台を突破。OS安定。"},
+  {"date":"2026-03-14","condition":5.6,"mainWorkout":"Home (アブローラー)","weightRepSet":"自重 / (10, 7, 6) / 3s","subWorkout":"なし","remarks":"アブローラー（膝コロ）。2セット目の粘り増。上昇気流。"},
+  {"date":"2026-03-15","condition":5.2,"mainWorkout":"RDL (ルーマニアンデッドリフト)","weightRepSet":"26.5kg / (10, 10, 8) / 3s","subWorkout":"バックエクステンション (7/7/7)","remarks":"メインをSQからRDLへ変更。大臀筋下部重視。"},
+  {"date":"2026-03-17","condition":null,"mainWorkout":"Home (アブローラー)","weightRepSet":"自重 / (6, 6, 6) / 3s","subWorkout":"なし","remarks":"アブローラー（膝コロ）。"},
+  {"date":"2026-03-18","condition":null,"mainWorkout":"PU (懸垂)","weightRepSet":"🟣バンド / (10, 7, 6) / 3s","subWorkout":"LPD 30kg (10*3) / DL 9kg (10/15)","remarks":"背中の感覚はまだ。二頭筋に熱感がある。"},
+  {"date":"2026-03-20","condition":5.3,"mainWorkout":"休息","weightRepSet":"—","subWorkout":"—","remarks":"背中にしっかり筋肉痛！嬉しい。胸の肩側の付け根や三頭筋にも心地よい張り。"},
+  {"date":"2026-03-21","condition":6.0,"mainWorkout":"BP (ベンチプレス)","weightRepSet":"45kg / (5, 5, 5) / 3s","subWorkout":"SC 15kg (10*3) / IC 9kg (10,7,7)","remarks":"BP 45kg初挑戦完遂。腕のボリュームも狙った構成。コンディション6.0到達！"},
+  {"date":"2026-03-22","condition":null,"mainWorkout":"Home (アブローラー)","weightRepSet":"自重 / (7, 7, 6) / 3s","subWorkout":"なし","remarks":"アブローラー（膝コロ）。"},
+  {"date":"2026-03-23","condition":null,"mainWorkout":"Home (アブローラー)","weightRepSet":"自重 / (7, 7, 7) / 3s","subWorkout":"なし","remarks":"アブローラー（膝コロ）。7回3セットで安定。"},
+  {"date":"2026-03-24","condition":null,"mainWorkout":"RDL (ルーマニアンデッドリフト)","weightRepSet":"25kg / (10, 10, 10) / 3s","subWorkout":"バックエクステンション (10, 10, 10)","remarks":"RDL 25kgで完遂。バックエクステンションも10回3セット。"},
+  {"date":"2026-03-25","condition":5.5,"mainWorkout":"休息","weightRepSet":"—","subWorkout":"—","remarks":"4日連続稼働後のOS確認。5.0以上をキープしており良好。"},
+  {"date":"2026-03-26","condition":null,"mainWorkout":"PU (懸垂)","weightRepSet":"🟣バンド / (10, 10, 10) / 3s","subWorkout":"LPD (10*3) / BP 40kg (9,10,6) / DL 10kg (10*3)","remarks":"懸垂10回3セット完遂。BP強化のため、サブ日に軽重量で組み込むテスト。"},
+  {"date":"2026-03-30","condition":5.6,"mainWorkout":"Home (アブローラー)","weightRepSet":"自重 / (7, 6, 6) / 3s","subWorkout":"なし","remarks":"アブローラー（膝コロ）。高コンディションを維持しつつ再始動。"},
+  {"date":"2026-04-02","condition":4.8,"mainWorkout":"休息","weightRepSet":"—","subWorkout":"—","remarks":"コンディション 4.8。少し落ち着いた数値。"},
+  {"date":"2026-04-06","condition":5.3,"mainWorkout":"休息","weightRepSet":"—","subWorkout":"—","remarks":"コンディション5.3まで上昇。エネルギーが戻ってきた感覚。"},
+  {"date":"2026-04-09","condition":null,"mainWorkout":"PU (懸垂) / RDL","weightRepSet":"懸垂 (8, 7, 6) / RDL 30kg (7, 7, 7)","subWorkout":"LPD (3s) / DL 10kg (10, 10, 10)","remarks":"RDLを30kgに増量。背面全体の出力を強化。"},
+  {"date":"2026-04-12","condition":6.1,"mainWorkout":"BP (ベンチプレス)","weightRepSet":"45kg / (7, 6, 4) / 3s","subWorkout":"DBP 14kg (9, 8, 7) / DF 8kg (9)","remarks":"BP 1セット目自己ベスト更新。DF 2セット目から左手首の痛みにより中断。要デバッグ。コンディション最高値。"}
+];
+
+function classifyType(mw) {
+  if (!mw || mw === "—") return "rest";
+  const restTerms = ["休息","完全休息","Active Recovery"];
+  return restTerms.some(t => mw.includes(t)) ? "rest" : "training";
+}
+
+const INITIAL_LOGS = SEED_RAW.map(e => ({
+  id: `seed_${e.date}`,
+  date: e.date,
+  condition: e.condition,
+  type: classifyType(e.mainWorkout),
+  mainWorkout: e.mainWorkout || "—",
+  weightRepSet: e.weightRepSet || "—",
+  subWorkout: e.subWorkout || "—",
+  remarks: e.remarks || "",
+}));
+
+/* ═══ Color helpers ══════════════════════════════════════ */
+function condColor(v) {
+  if (v == null) return "#9B9890";
+  if (v >= 7.5) return "#1F4A1A";
+  if (v >= 6.5) return "#2D5A27";
+  if (v >= 5.5) return "#4A8A44";
+  if (v >= 5.0) return "#7CB877";
+  if (v >= 4.0) return "#9B9890";
+  if (v >= 3.0) return "#C48A6A";
+  return "#C4613A";
+}
+function condLabel(v) {
+  if (v == null) return "—";
+  if (v >= 7.5) return "Excellent";
+  if (v >= 6.5) return "Very Good";
+  if (v >= 5.5) return "Good";
+  if (v >= 5.0) return "Above Neutral";
+  if (v >= 4.5) return "Neutral";
+  if (v >= 3.5) return "Below Neutral";
+  return "Low";
+}
+
+/* ═══ Date helpers ═══════════════════════════════════════ */
+const WD_JA = ["日","月","火","水","木","金","土"];
+const WD_EN = ["SUN","MON","TUE","WED","THU","FRI","SAT"];
+const MO_JA = ["1月","2月","3月","4月","5月","6月","7月","8月","9月","10月","11月","12月"];
+
+function fmtDate(ds) {
+  const d = new Date(ds + "T00:00:00");
+  return {
+    day: d.getDate(),
+    month: MO_JA[d.getMonth()],
+    year: d.getFullYear(),
+    wdJA: WD_JA[d.getDay()],
+    wdEN: WD_EN[d.getDay()],
+    short: `${d.getMonth()+1}/${d.getDate()}`,
+    full: `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日`,
+    ts: d.getTime(),
+  };
+}
+
+function todayISO() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+/* ═══ Smooth SVG Line Chart ══════════════════════════════ */
+function SmoothLineChart({ points, w = 640, h = 130, showNeutral = true, color = "#2D5A27" }) {
+  // points: [{x: timestamp_ms, y: number, label: string}]
+  if (!points || points.length < 1) return null;
+  const pad = { t: 18, r: 16, b: 28, l: 32 };
+  const iw = w - pad.l - pad.r;
+  const ih = h - pad.t - pad.b;
+
+  const xMin = points[0].x, xMax = points[points.length - 1].x;
+  const yVals = points.map(p => p.y);
+  const yMin = Math.max(0, Math.min(...yVals) - 0.8);
+  const yMax = Math.min(10, Math.max(...yVals) + 0.8);
+  const yRange = yMax - yMin || 1;
+  const xRange = xMax - xMin || 1;
+
+  const toX = v => pad.l + ((v - xMin) / xRange) * iw;
+  const toY = v => pad.t + ih - ((v - yMin) / yRange) * ih;
+
+  const pts = points.map(p => ({ ...p, px: toX(p.x), py: toY(p.y) }));
+
+  function catmullRom(arr) {
+    if (arr.length < 2) return arr.length === 1 ? `M${arr[0].px},${arr[0].py}` : "";
+    const t = 0.35;
+    let d = `M${arr[0].px},${arr[0].py}`;
+    for (let i = 0; i < arr.length - 1; i++) {
+      const p0 = arr[Math.max(0, i-1)], p1 = arr[i];
+      const p2 = arr[i+1], p3 = arr[Math.min(arr.length-1, i+2)];
+      const cp1x = p1.px + (p2.px - p0.px) * t;
+      const cp1y = p1.py + (p2.py - p0.py) * t;
+      const cp2x = p2.px - (p3.px - p1.px) * t;
+      const cp2y = p2.py - (p3.py - p1.py) * t;
+      d += ` C${cp1x},${cp1y},${cp2x},${cp2y},${p2.px},${p2.py}`;
+    }
+    return d;
+  }
+
+  const linePath = catmullRom(pts);
+  const last = pts[pts.length - 1];
+  const areaPath = `${linePath} L${last.px},${pad.t+ih} L${pts[0].px},${pad.t+ih} Z`;
+  const neutralY = toY(5.0);
+
+  // Y axis labels
+  const yLabels = [];
+  for (let v = Math.ceil(yMin); v <= Math.floor(yMax); v++) {
+    if (v >= 0 && v <= 10) yLabels.push(v);
+  }
+
+  return (
+    <svg width="100%" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="xMidYMid meet" style={{ display: "block", overflow: "visible" }}>
+      {/* Grid lines */}
+      {yLabels.map(v => (
+        <line key={v} x1={pad.l} y1={toY(v)} x2={pad.l+iw} y2={toY(v)}
+          stroke="#E4E1D8" strokeWidth={1} />
+      ))}
+      {/* Neutral reference */}
+      {showNeutral && neutralY >= pad.t && neutralY <= pad.t+ih && (
+        <line x1={pad.l} y1={neutralY} x2={pad.l+iw} y2={neutralY}
+          stroke="#9B9890" strokeWidth={1} strokeDasharray="4,3" opacity={0.6} />
+      )}
+      {/* Area */}
+      <path d={areaPath} fill={`${color}12`} />
+      {/* Line */}
+      <path d={linePath} fill="none" stroke={color} strokeWidth={2.5}
+        strokeLinecap="round" strokeLinejoin="round" />
+      {/* Dots */}
+      {pts.map((p, i) => (
+        <g key={i}>
+          <circle cx={p.px} cy={p.py} r={5} fill={color} stroke="var(--bg)" strokeWidth={2.5} />
+          {i === pts.length - 1 && (
+            <text x={p.px} y={p.py - 9} textAnchor="middle" fontSize={9}
+              fill={color} fontWeight="600">{p.y.toFixed(1)}</text>
+          )}
+        </g>
+      ))}
+      {/* Y labels */}
+      {yLabels.map(v => (
+        <text key={v} x={pad.l - 5} y={toY(v) + 3.5} textAnchor="end"
+          fontSize={8} fill="#9B9890">{v}</text>
+      ))}
+      {/* Neutral label */}
+      {showNeutral && neutralY >= pad.t && neutralY <= pad.t+ih && (
+        <text x={pad.l + iw + 4} y={neutralY + 3} fontSize={8} fill="#9B9890">±0</text>
+      )}
+    </svg>
+  );
+}
+
+/* ═══ Calendar Date Display ══════════════════════════════ */
+function CalendarDate({ dateStr }) {
+  const d = fmtDate(dateStr);
+  return (
+    <div style={{
+      display: "inline-flex", flexDirection: "column", alignItems: "center",
+      background: "#fff", borderRadius: 12, overflow: "hidden",
+      boxShadow: "0 4px 20px rgba(0,0,0,0.1), 0 1px 4px rgba(0,0,0,0.06)",
+      width: 92, userSelect: "none",
+    }}>
+      <div style={{
+        background: "var(--terra)", color: "#fff",
+        width: "100%", textAlign: "center",
+        padding: "7px 0",
+        fontSize: 10, letterSpacing: "0.12em", fontWeight: 700,
+        textTransform: "uppercase",
+      }}>
+        {d.month} {d.year}
+      </div>
+      <div style={{
+        fontSize: 54, fontWeight: 100, lineHeight: 1,
+        padding: "10px 8px 4px",
+        color: "var(--text)", letterSpacing: "-3px",
+        fontVariantNumeric: "tabular-nums",
+      }}>
+        {String(d.day).padStart(2, "\u2007")}
+      </div>
+      <div style={{
+        fontSize: 9, color: "var(--muted)", letterSpacing: "0.18em",
+        paddingBottom: 10, fontWeight: 500,
+      }}>
+        {d.wdEN}
+      </div>
+    </div>
+  );
+}
+
+/* ═══ Condition Orb ══════════════════════════════════════ */
+function CondOrb({ value, size = 42 }) {
+  const c = condColor(value);
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: "50%",
+      background: `${c}18`, border: `1.5px solid ${c}50`,
+      display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+    }}>
+      <span style={{
+        fontSize: size * 0.26, fontWeight: 700, color: c,
+        fontVariantNumeric: "tabular-nums", letterSpacing: "-0.5px",
+      }}>
+        {value != null ? value.toFixed(1) : "—"}
+      </span>
+    </div>
+  );
+}
+
+/* ═══ OS Bar ═════════════════════════════════════════════ */
+function OSBar({ value }) {
+  const pct = (value / 10) * 100;
+  const c = condColor(value);
+  const diff = value - 5.0;
+  return (
+    <div>
+      <div style={{
+        display: "flex", justifyContent: "space-between",
+        fontSize: 9, color: "var(--muted)", letterSpacing: "0.08em", marginBottom: 8,
+      }}>
+        <span>0</span><span>NEUTRAL  5.0</span><span>10</span>
+      </div>
+      <div style={{ height: 4, background: "var(--border)", borderRadius: 2, position: "relative" }}>
+        <div style={{
+          position: "absolute", left: 0, top: 0, bottom: 0,
+          width: `${pct}%`, borderRadius: 2,
+          background: `linear-gradient(to right, var(--border) 50%, ${c} 50%)`,
+          transition: "width .7s cubic-bezier(.34,1.56,.64,1)",
+        }} />
+        <div style={{
+          position: "absolute", left: "50%", top: -5, bottom: -5,
+          width: 1.5, background: "var(--muted)", opacity: .45, transform: "translateX(-50%)",
+        }} />
+        <div style={{
+          position: "absolute", left: `${pct}%`, top: "50%",
+          transform: "translate(-50%,-50%)",
+          width: 13, height: 13, borderRadius: "50%",
+          background: c, border: "2.5px solid var(--bg)",
+          boxShadow: `0 0 0 1.5px ${c}60`,
+          transition: "left .7s cubic-bezier(.34,1.56,.64,1)",
+        }} />
+      </div>
+      <div style={{ marginTop: 10, textAlign: "center", fontSize: 10, color: "var(--muted)", letterSpacing: "0.07em" }}>
+        OS DELTA:{" "}
+        <span style={{ color: c, fontWeight: 700 }}>{diff >= 0 ? "+" : ""}{diff.toFixed(1)}</span>
+        <span style={{ margin: "0 8px", opacity: .4 }}>·</span>
+        <span style={{ color: c }}>{condLabel(value)}</span>
+      </div>
+    </div>
+  );
+}
+
+/* ═══ Dashboard ══════════════════════════════════════════ */
+function Dashboard({ logs }) {
+  const sorted = [...logs].sort((a, b) => new Date(b.date) - new Date(a.date));
+  const latest = sorted[0];
+
+  if (!latest) return (
+    <div style={{ textAlign: "center", padding: "80px 24px", color: "var(--muted)" }}>
+      <p>まだデータがありません。「記録」タブから追加してください。</p>
+    </div>
+  );
+
+  const d = fmtDate(latest.date);
+  const c = condColor(latest.condition);
+
+  // Trend data (last 10 with condition)
+  const trendData = sorted
+    .filter(l => l.condition != null)
+    .slice(0, 10)
+    .reverse()
+    .map(l => ({ x: new Date(l.date + "T00:00:00").getTime(), y: l.condition, label: fmtDate(l.date).short }));
+
+  const isRest = latest.type === "rest";
+
+  return (
+    <div className="fade-up" style={{ padding: "36px 24px 48px" }}>
+
+      {/* Hero */}
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 28, marginBottom: 40 }}>
+        <CalendarDate dateStr={latest.date} />
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 10, letterSpacing: ".25em", color: "var(--muted)", textTransform: "uppercase", marginBottom: 10 }}>
+            Latest Condition
+          </div>
+          <div style={{
+            fontSize: 80, fontWeight: 100, color: c,
+            lineHeight: 1, letterSpacing: "-5px",
+            fontVariantNumeric: "tabular-nums",
+          }}>
+            {latest.condition != null ? latest.condition.toFixed(1) : "—"}
+          </div>
+          {latest.condition != null && (
+            <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 8 }}>
+              <span style={{
+                padding: "3px 10px", borderRadius: 100,
+                background: `${c}18`, color: c,
+                fontSize: 11, fontWeight: 700,
+                border: `1px solid ${c}30`,
+              }}>
+                {latest.condition >= 5 ? "+" : ""}{(latest.condition - 5).toFixed(1)} OS
+              </span>
+              <span style={{ fontSize: 11, color: "var(--muted)" }}>{condLabel(latest.condition)}</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* OS Bar */}
+      {latest.condition != null && (
+        <div style={{ marginBottom: 32 }}>
+          <OSBar value={latest.condition} />
+        </div>
+      )}
+
+      {/* Latest Session Card */}
+      <div style={{
+        background: "var(--surface)", border: "1px solid var(--border)",
+        borderRadius: 10, padding: "22px 22px 18px", marginBottom: 16,
+      }}>
+        <div style={{
+          fontSize: 9, letterSpacing: ".18em", color: "var(--muted)",
+          textTransform: "uppercase", marginBottom: 14,
+        }}>Latest Session</div>
+
+        {isRest ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 10, color: "var(--muted)", fontSize: 14 }}>
+            <span style={{ fontSize: 22 }}>🌿</span>
+            <span>休息日 — {latest.remarks || "リカバリー"}</span>
+          </div>
+        ) : (
+          <>
+            {/* Main */}
+            {latest.mainWorkout && latest.mainWorkout !== "—" && (
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: 9, letterSpacing: ".15em", color: "var(--muted)", textTransform: "uppercase", marginBottom: 8 }}>Main</div>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
+                  <span style={{ fontSize: 16, fontWeight: 700, color: "var(--green)" }}>{latest.mainWorkout}</span>
+                  <span style={{ fontSize: 13, color: "var(--muted)", fontVariantNumeric: "tabular-nums" }}>{latest.weightRepSet}</span>
+                </div>
+              </div>
+            )}
+            {/* Sub — same design as main */}
+            {latest.subWorkout && latest.subWorkout !== "—" && latest.subWorkout !== "なし" && (
+              <div style={{ borderTop: "1px solid #F2EFE8", paddingTop: 12 }}>
+                <div style={{ fontSize: 9, letterSpacing: ".15em", color: "var(--muted)", textTransform: "uppercase", marginBottom: 8 }}>Sub</div>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
+                  <span style={{ fontSize: 16, fontWeight: 700, color: "var(--green)" }}>{latest.subWorkout.split("/")[0].trim()}</span>
+                  {latest.subWorkout.includes("/") && (
+                    <span style={{ fontSize: 13, color: "var(--muted)" }}>{latest.subWorkout.substring(latest.subWorkout.indexOf("/")+1).trim()}</span>
+                  )}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {latest.remarks && (
+          <div style={{
+            marginTop: 14, padding: "10px 14px",
+            background: "var(--terra-dim)", borderLeft: "2.5px solid var(--terra)",
+            borderRadius: "0 6px 6px 0", fontSize: 12, color: "#555", lineHeight: 1.75,
+          }}>
+            {latest.remarks}
+          </div>
+        )}
+      </div>
+
+      {/* Trend Line Chart */}
+      {trendData.length >= 2 && (
+        <div style={{
+          background: "var(--surface)", border: "1px solid var(--border)",
+          borderRadius: 10, padding: "20px 20px 14px",
+        }}>
+          <div style={{ fontSize: 9, letterSpacing: ".18em", color: "var(--muted)", textTransform: "uppercase", marginBottom: 12 }}>
+            Condition Trend
+          </div>
+          <SmoothLineChart points={trendData} h={110} showNeutral={true} />
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: "var(--muted)", marginTop: 6, padding: "0 32px 0 32px" }}>
+            <span>{trendData[0].label}</span>
+            <span>{trendData[trendData.length-1].label}</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ═══ Condition Tab ══════════════════════════════════════ */
+const PERIODS = [
+  { key: "1w", label: "1週間", days: 7 },
+  { key: "1m", label: "1ヶ月", days: 30 },
+  { key: "3m", label: "3ヶ月", days: 90 },
+  { key: "6m", label: "6ヶ月", days: 180 },
+  { key: "1y", label: "1年",   days: 365 },
+];
+
+function ConditionTab({ logs, onUpdateCondition }) {
+  const [period, setPeriod] = useState("1m");
+  const [date, setDate]     = useState(todayISO());
+  const [cond, setCond]     = useState(5.0);
+  const [saved, setSaved]   = useState(false);
+
+  const periodDays = PERIODS.find(p => p.key === period).days;
+  const cutoff = Date.now() - periodDays * 86400000;
+
+  const chartPoints = useMemo(() => {
+    return logs
+      .filter(l => l.condition != null && new Date(l.date + "T00:00:00").getTime() >= cutoff)
+      .sort((a, b) => new Date(a.date) - new Date(b.date))
+      .map(l => ({
+        x: new Date(l.date + "T00:00:00").getTime(),
+        y: l.condition,
+        label: fmtDate(l.date).short,
+      }));
+  }, [logs, period]);
+
+  // Find existing entry for selected date
+  const existing = logs.find(l => l.date === date);
+  const existingCond = existing ? existing.condition : null;
+
+  const handleSave = () => {
+    onUpdateCondition(date, parseFloat(cond));
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
+  const cv = parseFloat(cond);
+  const cc = condColor(cv);
+  const pct = (cv / 10) * 100;
+
+  // Summary stats for period
+  const withCond = chartPoints.map(p => p.y);
+  const avg = withCond.length ? (withCond.reduce((a,b) => a+b, 0) / withCond.length) : null;
+  const maxV = withCond.length ? Math.max(...withCond) : null;
+  const minV = withCond.length ? Math.min(...withCond) : null;
+
+  return (
+    <div className="fade-up" style={{ padding: "28px 24px 56px" }}>
+
+      {/* Graph section */}
+      <div style={{
+        background: "var(--surface)", border: "1px solid var(--border)",
+        borderRadius: 10, padding: "20px 20px 12px", marginBottom: 24,
+      }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, letterSpacing: ".03em" }}>
+            コンディション推移
+          </div>
+          {/* Period selector */}
+          <div style={{ display: "flex", gap: 2 }}>
+            {PERIODS.map(p => (
+              <button key={p.key} onClick={() => setPeriod(p.key)} style={{
+                background: period === p.key ? "var(--green)" : "none",
+                color: period === p.key ? "#fff" : "var(--muted)",
+                border: "1px solid",
+                borderColor: period === p.key ? "var(--green)" : "var(--border)",
+                borderRadius: 4, padding: "4px 8px",
+                fontSize: 10, fontWeight: 600, letterSpacing: ".05em",
+                transition: "all .15s",
+              }}>
+                {p.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {chartPoints.length >= 2 ? (
+          <>
+            <SmoothLineChart points={chartPoints} h={140} showNeutral={true} />
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: "var(--muted)", marginTop: 4, padding: "0 30px" }}>
+              <span>{chartPoints[0].label}</span>
+              <span>{chartPoints[chartPoints.length-1].label}</span>
+            </div>
+            {/* Stats */}
+            <div style={{ display: "flex", gap: 0, borderTop: "1px solid var(--border)", marginTop: 14 }}>
+              {[
+                { label: "平均", val: avg != null ? avg.toFixed(2) : "—" },
+                { label: "最高", val: maxV != null ? maxV.toFixed(1) : "—" },
+                { label: "最低", val: minV != null ? minV.toFixed(1) : "—" },
+                { label: "記録数", val: withCond.length },
+              ].map((s, i) => (
+                <div key={i} style={{
+                  flex: 1, textAlign: "center", padding: "12px 8px",
+                  borderRight: i < 3 ? "1px solid var(--border)" : "none",
+                }}>
+                  <div style={{ fontSize: 9, color: "var(--muted)", letterSpacing: ".1em", marginBottom: 4 }}>{s.label}</div>
+                  <div style={{ fontSize: 16, fontWeight: 300, color: "var(--green)", letterSpacing: "-0.5px" }}>{s.val}</div>
+                </div>
+              ))}
+            </div>
+          </>
+        ) : (
+          <div style={{ textAlign: "center", padding: "40px 0", color: "var(--muted)", fontSize: 13 }}>
+            この期間のコンディションデータがありません
+          </div>
+        )}
+      </div>
+
+      {/* Record section */}
+      <div style={{
+        background: "var(--surface)", border: "1px solid var(--border)",
+        borderRadius: 10, padding: "22px",
+      }}>
+        <div style={{ fontSize: 13, fontWeight: 600, letterSpacing: ".03em", marginBottom: 22 }}>
+          コンディションを記録
+        </div>
+
+        {/* Date */}
+        <div style={{ marginBottom: 24 }}>
+          <div style={LABEL_S}>日付</div>
+          <input type="date" value={date} onChange={e => setDate(e.target.value)} />
+          {existingCond != null && (
+            <div style={{ marginTop: 6, fontSize: 11, color: "var(--muted)" }}>
+              この日の記録: <span style={{ color: condColor(existingCond), fontWeight: 700 }}>{existingCond.toFixed(1)}</span>（上書き可）
+            </div>
+          )}
+        </div>
+
+        {/* Slider */}
+        <div style={{ marginBottom: 28 }}>
+          <div style={{ ...LABEL_S, display: "flex", alignItems: "baseline", gap: 10 }}>
+            <span>コンディション</span>
+            <span style={{ fontSize: 26, fontWeight: 100, color: cc, letterSpacing: "-1.5px", fontVariantNumeric: "tabular-nums" }}>
+              {cv.toFixed(1)}
+            </span>
+            <span style={{ fontSize: 10, color: cc, fontWeight: 700, padding: "2px 8px", borderRadius: 100, background: `${cc}15`, border: `1px solid ${cc}30` }}>
+              {cv >= 5 ? "+" : ""}{(cv-5).toFixed(1)} OS
+            </span>
+          </div>
+          <div style={{ padding: "10px 0" }}>
+            <input type="range" min="0" max="10" step="0.1"
+              value={cond}
+              onChange={e => setCond(e.target.value)}
+              style={{ background: `linear-gradient(to right, ${cc} ${pct}%, var(--border) ${pct}%)` }}
+            />
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: "var(--muted)", marginTop: 5 }}>
+              <span>0  LOW</span>
+              <span>◆ NEUTRAL 5.0</span>
+              <span>HIGH  10</span>
+            </div>
+          </div>
+        </div>
+
+        <button onClick={handleSave} style={{
+          width: "100%", padding: "13px",
+          background: saved ? "var(--green)" : "var(--terra)",
+          color: "#fff", border: "none", borderRadius: 7,
+          fontSize: 14, fontWeight: 600, letterSpacing: ".06em",
+          transition: "background .35s",
+          boxShadow: `0 3px 12px ${saved ? "rgba(45,90,39,.25)" : "rgba(196,97,58,.25)"}`,
+        }}>
+          {saved ? "✓  保存しました" : "記録する"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ═══ History / Notes Tab ════════════════════════════════ */
+const FILTERS = [
+  { key: "all",      label: "全て" },
+  { key: "training", label: "トレーニング" },
+  { key: "rest",     label: "休息" },
+  { key: "blank",    label: "無記入" },
+];
+
+function History({ logs }) {
+  const [filter, setFilter] = useState("all");
+  const [expanded, setExpanded] = useState(new Set());
+
+  const sorted = [...logs].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+  const filtered = sorted.filter(l => {
+    if (filter === "all")      return true;
+    if (filter === "training") return l.type === "training";
+    if (filter === "rest")     return l.type === "rest" && (l.mainWorkout !== "—" && l.mainWorkout);
+    if (filter === "blank")    return l.mainWorkout === "—" || !l.mainWorkout;
+    return true;
+  });
+
+  const toggle = id => setExpanded(prev => {
+    const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n;
+  });
+
+  return (
+    <div className="fade-up" style={{ paddingBottom: 48 }}>
+      <div style={{ padding: "24px 24px 0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <h2 style={{ fontSize: 13, fontWeight: 600, letterSpacing: ".05em" }}>トレーニングノート</h2>
+        <span style={{ fontSize: 11, color: "var(--muted)" }}>{filtered.length} entries</span>
+      </div>
+
+      {/* Filter */}
+      <div style={{ display: "flex", gap: 6, padding: "14px 24px", overflowX: "auto" }}>
+        {FILTERS.map(f => (
+          <button key={f.key} onClick={() => setFilter(f.key)} style={{
+            background: filter === f.key ? "var(--green)" : "none",
+            color: filter === f.key ? "#fff" : "var(--muted)",
+            border: "1px solid",
+            borderColor: filter === f.key ? "var(--green)" : "var(--border)",
+            borderRadius: 100, padding: "5px 14px",
+            fontSize: 11, fontWeight: 600, whiteSpace: "nowrap",
+            transition: "all .15s",
+          }}>
+            {f.label}
+          </button>
+        ))}
+      </div>
+
+      <div style={{ overflowX: "auto" }}>
+        <table style={{ minWidth: 580 }}>
+          <thead>
+            <tr>
+              <th style={{ width: 64 }}>日付</th>
+              <th style={{ width: 52 }}>状態</th>
+              <th style={{ width: 70 }}>種別</th>
+              <th>メイン種目</th>
+              <th style={{ width: 100 }}>サブ種目</th>
+              <th style={{ width: 140 }}>備考</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((log, idx) => {
+              const d = fmtDate(log.date);
+              const isExp = expanded.has(log.id);
+              const hasNote = log.remarks && log.remarks.length > 0;
+              const isLong = log.remarks && log.remarks.length > 28;
+
+              return (
+                <tr key={log.id} style={{ animation: `rowIn .3s ease ${Math.min(idx,8)*.04}s both` }}>
+                  <td>
+                    <div style={{ fontVariantNumeric: "tabular-nums", fontWeight: 700, fontSize: 13 }}>{d.short}</div>
+                    <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 1 }}>{d.wdJA}</div>
+                  </td>
+                  <td style={{ paddingTop: 11, paddingBottom: 11 }}>
+                    <CondOrb value={log.condition} size={40} />
+                  </td>
+                  <td>
+                    <span style={{
+                      display: "inline-block",
+                      fontSize: 10, padding: "3px 8px", borderRadius: 100,
+                      background: log.type === "training" ? "var(--green-dim)" : "#F5F3EF",
+                      color: log.type === "training" ? "var(--green)" : "var(--muted)",
+                      fontWeight: 600, letterSpacing: ".05em", whiteSpace: "nowrap",
+                    }}>
+                      {log.type === "training" ? "運動" : "休息"}
+                    </span>
+                  </td>
+                  <td>
+                    {log.mainWorkout && log.mainWorkout !== "—" ? (
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: 12, color: "var(--green)" }}>{log.mainWorkout}</div>
+                        {log.weightRepSet && log.weightRepSet !== "—" && (
+                          <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2, fontVariantNumeric: "tabular-nums" }}>{log.weightRepSet}</div>
+                        )}
+                      </div>
+                    ) : <span style={{ color: "#D0CDC5" }}>—</span>}
+                  </td>
+                  <td>
+                    {log.subWorkout && log.subWorkout !== "—" && log.subWorkout !== "なし" ? (
+                      <span style={{ fontSize: 11, color: "#666" }}>{log.subWorkout}</span>
+                    ) : <span style={{ color: "#D0CDC5", fontSize: 11 }}>—</span>}
+                  </td>
+                  <td>
+                    {hasNote ? (
+                      <div onClick={() => isLong && toggle(log.id)} style={{ cursor: isLong ? "pointer" : "default" }}>
+                        <div style={{
+                          fontSize: 11, color: "#555", lineHeight: 1.65,
+                          display: isExp ? "block" : "-webkit-box",
+                          WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden",
+                        }}>
+                          {isExp ? log.remarks : log.remarks}
+                        </div>
+                        {isLong && (
+                          <div style={{ fontSize: 9, color: "var(--terra)", marginTop: 2 }}>
+                            {isExp ? "▲ 閉じる" : "▼ 展開"}
+                          </div>
+                        )}
+                      </div>
+                    ) : <span style={{ color: "#D0CDC5", fontSize: 11 }}>—</span>}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+/* ═══ Style helpers ══════════════════════════════════════ */
+const LABEL_S = {
+  display: "block", fontSize: 10, letterSpacing: ".15em",
+  color: "var(--muted)", textTransform: "uppercase", marginBottom: 10,
+};
+
+function AddBtn({ onClick, label }) {
+  return (
+    <button type="button" onClick={onClick} style={{
+      background: "none", border: "1px dashed #C8C4BC", color: "var(--muted)",
+      padding: "6px 14px", borderRadius: 6, fontSize: 11, letterSpacing: ".05em",
+      transition: "all .15s",
+    }}
+      onMouseEnter={e => { e.currentTarget.style.borderColor="var(--green)"; e.currentTarget.style.color="var(--green)"; }}
+      onMouseLeave={e => { e.currentTarget.style.borderColor="#C8C4BC"; e.currentTarget.style.color="var(--muted)"; }}
+    >{label}</button>
+  );
+}
+
+/* ═══ Record Form ════════════════════════════════════════ */
+function RecordForm({ onSubmit }) {
+  const [type, setType]   = useState("training");  // "training" | "rest"
+  const [date, setDate]   = useState("2026-04-12");
+  const [cond, setCond]   = useState(5.0);
+  const [mainExs, setMainExs] = useState([{ name: "", weight: "", reps: "" }]);
+  const [subExs, setSubExs]   = useState([{ name: "", weight: "", reps: "" }]);
+  const [note, setNote]   = useState("");
+  const [saved, setSaved] = useState(false);
+
+  const updMain = (i, k, v) => setMainExs(a => { const n=[...a]; n[i]={...n[i],[k]:v}; return n; });
+  const updSub  = (i, k, v) => setSubExs(a  => { const n=[...a]; n[i]={...n[i],[k]:v}; return n; });
+
+  const buildExStr = (exs) => exs.filter(e=>e.name.trim()).map(e=>{
+    const parts = [e.name.trim()];
+    if (e.weight.trim()) parts.push(e.weight.trim());
+    if (e.reps.trim()) parts.push(`(${e.reps.trim()})`);
+    return parts.join(" ");
+  }).join(" / ");
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    const mainStr = type === "training" ? (buildExStr(mainExs) || "—") : "休息";
+    const subStr  = type === "training" ? (buildExStr(subExs)  || "—") : "—";
+
+    // Build weightRepSet from main exercises
+    const wrs = type === "training"
+      ? mainExs.filter(ex=>ex.name.trim()).map(ex=>`${ex.weight} (${ex.reps})`).join(" / ")
+      : "—";
+
+    onSubmit({
+      id: Date.now().toString(),
+      date, condition: parseFloat(cond),
+      type,
+      mainWorkout: mainStr,
+      weightRepSet: wrs || "—",
+      subWorkout: subStr,
+      remarks: note,
+    });
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+    setMainExs([{ name: "", weight: "", reps: "" }]);
+    setSubExs([{ name: "", weight: "", reps: "" }]);
+    setNote("");
+  };
+
+  const cv = parseFloat(cond);
+  const cc = condColor(cv);
+  const pct = (cv / 10) * 100;
+
+  return (
+    <div className="fade-up" style={{ padding: "28px 24px 56px" }}>
+      <h2 style={{ fontSize: 13, fontWeight: 600, letterSpacing: ".05em", marginBottom: 28 }}>新しい記録</h2>
+      <form onSubmit={handleSubmit}>
+
+        {/* Type toggle */}
+        <div style={{ marginBottom: 28 }}>
+          <div style={LABEL_S}>種別</div>
+          <div style={{ display: "flex", gap: 8 }}>
+            {[["training","トレーニング"],["rest","休息"]].map(([k,l]) => (
+              <button key={k} type="button" onClick={() => setType(k)} style={{
+                flex: 1, padding: "12px",
+                background: type === k ? (k === "training" ? "var(--green)" : "var(--terra)") : "var(--surface)",
+                color: type === k ? "#fff" : "var(--muted)",
+                border: `1px solid ${type === k ? (k === "training" ? "var(--green)" : "var(--terra)") : "var(--border)"}`,
+                borderRadius: 8, fontSize: 14, fontWeight: 600,
+                transition: "all .2s",
+              }}>
+                {k === "training" ? "💪 " : "🌿 "}{l}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Date */}
+        <div style={{ marginBottom: 24 }}>
+          <div style={LABEL_S}>日付</div>
+          <input type="date" value={date} onChange={e => setDate(e.target.value)} required />
+        </div>
+
+        {/* Condition — common */}
+        <div style={{ marginBottom: 28 }}>
+          <div style={{ ...LABEL_S, display: "flex", alignItems: "baseline", gap: 10 }}>
+            <span>コンディション</span>
+            <span style={{ fontSize: 26, fontWeight: 100, color: cc, letterSpacing: "-1.5px", fontVariantNumeric: "tabular-nums" }}>
+              {cv.toFixed(1)}
+            </span>
+            <span style={{ fontSize: 10, color: cc, fontWeight: 700, padding: "2px 8px", borderRadius: 100, background: `${cc}15`, border: `1px solid ${cc}30` }}>
+              {cv >= 5 ? "+" : ""}{(cv-5).toFixed(1)} OS
+            </span>
+          </div>
+          <div style={{ padding: "10px 0" }}>
+            <input type="range" min="0" max="10" step="0.1"
+              value={cond} onChange={e => setCond(e.target.value)}
+              style={{ background: `linear-gradient(to right, ${cc} ${pct}%, var(--border) ${pct}%)` }}
+            />
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: "var(--muted)", marginTop: 5 }}>
+              <span>0  LOW</span><span>◆ NEUTRAL 5.0</span><span>HIGH  10</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Training-only inputs */}
+        {type === "training" && (
+          <>
+            {/* Main exercises */}
+            <div style={{ marginBottom: 22 }}>
+              <div style={LABEL_S}>メイン種目</div>
+              {mainExs.map((ex, i) => (
+                <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 76px 100px", gap: 6, marginBottom: 6 }}>
+                  <input type="text" placeholder="種目名 (例: BP)" value={ex.name} onChange={e => updMain(i,"name",e.target.value)} />
+                  <input type="text" placeholder="重量" value={ex.weight} onChange={e => updMain(i,"weight",e.target.value)} />
+                  <input type="text" placeholder="回数 7,6,4" value={ex.reps} onChange={e => updMain(i,"reps",e.target.value)} />
+                </div>
+              ))}
+              <AddBtn onClick={() => setMainExs(a => [...a, {name:"",weight:"",reps:""}])} label="+ 種目を追加" />
+            </div>
+
+            {/* Sub exercises */}
+            <div style={{ marginBottom: 22 }}>
+              <div style={LABEL_S}>サブ種目</div>
+              {subExs.map((ex, i) => (
+                <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 76px 100px", gap: 6, marginBottom: 6 }}>
+                  <input type="text" placeholder="種目名 (例: DBP)" value={ex.name} onChange={e => updSub(i,"name",e.target.value)} />
+                  <input type="text" placeholder="重量" value={ex.weight} onChange={e => updSub(i,"weight",e.target.value)} />
+                  <input type="text" placeholder="回数 9,8,7" value={ex.reps} onChange={e => updSub(i,"reps",e.target.value)} />
+                </div>
+              ))}
+              <AddBtn onClick={() => setSubExs(a => [...a, {name:"",weight:"",reps:""}])} label="+ 種目を追加" />
+            </div>
+          </>
+        )}
+
+        {/* Note */}
+        <div style={{ marginBottom: 32 }}>
+          <div style={LABEL_S}>メモ・備考</div>
+          <textarea placeholder="気づいたこと、体の状態など..." value={note} onChange={e => setNote(e.target.value)} />
+        </div>
+
+        <button type="submit" style={{
+          width: "100%", padding: "14px",
+          background: saved ? "var(--green)" : "var(--terra)",
+          color: "#fff", border: "none", borderRadius: 7,
+          fontSize: 14, fontWeight: 600, letterSpacing: ".07em",
+          transition: "background .35s",
+          boxShadow: `0 3px 14px ${saved ? "rgba(45,90,39,.25)" : "rgba(196,97,58,.25)"}`,
+        }}>
+          {saved ? "✓  記録しました" : "記録する"}
+        </button>
+      </form>
+    </div>
+  );
+}
+
+/* ═══ App Shell ══════════════════════════════════════════ */
+const TABS = [
+  { id: "dashboard",  label: "ダッシュボード" },
+  { id: "condition",  label: "コンディション" },
+  { id: "history",    label: "ノート" },
+  { id: "record",     label: "記録" },
+];
+
+function App() {
+  const [logs, setLogs] = useState(() => {
+    try { const s = localStorage.getItem(SK); if (s) return JSON.parse(s); } catch {}
+    return INITIAL_LOGS;
+  });
+  const [tab, setTab] = useState("dashboard");
+
+  useEffect(() => {
+    try { localStorage.setItem(SK, JSON.stringify(logs)); } catch {}
+  }, [logs]);
+
+  const addLog = useCallback(log => {
+    setLogs(prev => {
+      const idx = prev.findIndex(l => l.date === log.date);
+      if (idx >= 0) { const n=[...prev]; n[idx]=log; return n; }
+      return [...prev, log];
+    });
+    setTab("history");
+  }, []);
+
+  const updateCondition = useCallback((date, value) => {
+    setLogs(prev => {
+      const idx = prev.findIndex(l => l.date === date);
+      if (idx >= 0) {
+        const n = [...prev]; n[idx] = { ...n[idx], condition: value }; return n;
+      }
+      return [...prev, {
+        id: `cond_${date}_${Date.now()}`,
+        date, condition: value, type: "rest",
+        mainWorkout: "—", weightRepSet: "—", subWorkout: "—", remarks: "",
+      }];
+    });
+  }, []);
+
+  return (
+    <div style={{ maxWidth: 700, margin: "0 auto", minHeight: "100vh" }}>
+
+      {/* Header */}
+      <header style={{
+        padding: "24px 24px 0",
+        borderBottom: "1px solid var(--border)",
+        position: "sticky", top: 0,
+        background: "var(--bg)", zIndex: 10,
+      }}>
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ fontSize: 9, letterSpacing: ".28em", color: "var(--muted)", textTransform: "uppercase", marginBottom: 4 }}>
+            PERSONAL HEALTH LOG
+          </div>
+          <h1 style={{ fontSize: 18, fontWeight: 300, color: "var(--green)", letterSpacing: ".01em" }}>
+            Self Conditioning App
+          </h1>
+        </div>
+
+        <nav style={{ display: "flex", overflowX: "auto" }}>
+          {TABS.map(t => (
+            <button key={t.id} onClick={() => setTab(t.id)} style={{
+              background: "none", border: "none",
+              borderBottom: tab === t.id ? "2.5px solid var(--green)" : "2.5px solid transparent",
+              padding: "9px 16px", fontSize: 12,
+              color: tab === t.id ? "var(--green)" : "var(--muted)",
+              fontWeight: tab === t.id ? 700 : 400,
+              letterSpacing: ".02em", marginBottom: -1,
+              transition: "color .2s,border-color .2s",
+              whiteSpace: "nowrap",
+            }}>
+              {t.label}
+            </button>
+          ))}
+        </nav>
+      </header>
+
+      <main>
+        {tab === "dashboard" && <Dashboard key="db" logs={logs} />}
+        {tab === "condition" && <ConditionTab key="cond" logs={logs} onUpdateCondition={updateCondition} />}
+        {tab === "history"   && <History key="hist" logs={logs} />}
+        {tab === "record"    && <RecordForm key="rec" onSubmit={addLog} />}
+      </main>
+
+      <footer style={{
+        padding: "24px", textAlign: "center",
+        borderTop: "1px solid var(--border)",
+        fontSize: 9, color: "#D0CDC5", letterSpacing: ".15em",
+      }}>
+        SELF CONDITIONING APP  ·  OS SYSTEM  5.0 NEUTRAL
+      </footer>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
