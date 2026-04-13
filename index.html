@@ -4,6 +4,15 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
   <title>Self Conditioning App</title>
+
+  <!-- PWA Manifest & Metadata -->
+  <link rel="manifest" href="/manifest.json" />
+  <meta name="theme-color" content="#2D5A27" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Conditioning" />
+  <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect fill='%232D5A27' width='180' height='180'/><text x='50%' y='50%' font-size='90' font-weight='bold' fill='white' text-anchor='middle' dominant-baseline='central' font-family='system-ui'>◆</text></svg>" />
+
   <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -85,7 +94,7 @@
 const { useState, useEffect, useCallback, useMemo, useRef } = React;
 
 /* ═══ App Version ═══════════════════════════════════════  */
-const APP_VERSION = "v1.0.0";
+const APP_VERSION = "v1.0.1";
 
 /* ═══ Storage ═══════════════════════════════════════════ */
 const SK     = "phl_tracker_v1";
@@ -1214,15 +1223,57 @@ function App() {
     return INITIAL_LOGS;
   });
   const [tab, setTab] = useState("dashboard");
+  const [updateAvailable, setUpdateAvailable] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const swRef = useRef(null);
 
   const handleAuth = () => {
     setHiding(true);
     setTimeout(() => setAuthed(true), 350);
   };
 
+  // Manual update: Request SW to skip waiting and reload
+  const handleForceUpdate = () => {
+    console.log("[App] Force update triggered");
+    if (swRef.current) {
+      swRef.current.waiting?.postMessage({ type: "SKIP_WAITING" });
+      // Wait a moment for SW to activate, then reload
+      setTimeout(() => {
+        window.location.reload(true); // true = bypass cache
+      }, 500);
+    }
+  };
+
   useEffect(() => {
     try { localStorage.setItem(SK, JSON.stringify(logs)); } catch {}
   }, [logs]);
+
+  // Service Worker registration & update notification
+  useEffect(() => {
+    if (!("serviceWorker" in navigator)) return;
+
+    navigator.serviceWorker.register("/sw.js").then((reg) => {
+      console.log("[App] Service Worker registered:", reg);
+      swRef.current = reg;
+
+      // Listen for updates from SW
+      navigator.serviceWorker.addEventListener("message", (event) => {
+        console.log("[App] Message from SW:", event.data);
+        if (event.data && event.data.type === "UPDATE_AVAILABLE") {
+          console.log("[App] Update available!");
+          setUpdateAvailable(true);
+        }
+      });
+
+      // Check for updates periodically (every 1 hour)
+      const interval = setInterval(() => {
+        if (reg.installing) return;
+        reg.update().catch((err) => console.warn("[App] Update check failed:", err));
+      }, 3600000);
+
+      return () => clearInterval(interval);
+    });
+  }, []);
 
   const addLog = useCallback(log => {
     setLogs(prev => {
@@ -1271,7 +1322,25 @@ function App() {
       }}>
         {/* Title row + user */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-          <div>
+          {/* Left: Gear icon */}
+          <button
+            onClick={() => setShowSettings(!showSettings)}
+            style={{
+              background: "none", border: "none", padding: "8px",
+              cursor: "pointer", display: "flex", alignItems: "center",
+              justifyContent: "center", color: "var(--muted)",
+              transition: "color .2s",
+              fontSize: 18,
+            }}
+            onMouseEnter={(e) => e.target.style.color = "var(--green)"}
+            onMouseLeave={(e) => e.target.style.color = "var(--muted)"}
+            title="設定"
+          >
+            ⚙️
+          </button>
+
+          {/* Center: Title */}
+          <div style={{ flex: 1, textAlign: "center" }}>
             <div style={{ fontSize: 9, letterSpacing: ".28em", color: "var(--muted)", textTransform: "uppercase", marginBottom: 3 }}>
               PERSONAL HEALTH LOG
             </div>
@@ -1279,7 +1348,8 @@ function App() {
               Self Conditioning App
             </h1>
           </div>
-          {/* User badge */}
+
+          {/* Right: User badge */}
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
             <div style={{
               width: 30, height: 30, borderRadius: "50%",
@@ -1320,6 +1390,98 @@ function App() {
         {tab === "history"   && <History key="hist" logs={logs} />}
         {tab === "record"    && <RecordForm key="rec" onSubmit={addLog} logs={logs} />}
       </main>
+
+      {/* Settings Modal */}
+      {showSettings && (
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 999,
+          background: "rgba(0,0,0,.4)", display: "flex",
+          alignItems: "flex-end", justifyContent: "center",
+          animation: "fadeUp .25s ease",
+        }}>
+          <div style={{
+            background: "var(--surface)", borderRadius: "16px 16px 0 0",
+            padding: "28px 24px", maxWidth: "100%", width: "100%",
+            maxHeight: "80vh", overflowY: "auto",
+            borderTop: "1px solid var(--border)",
+          }}>
+            {/* Header */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+              <h2 style={{ fontSize: 17, fontWeight: 600, letterSpacing: ".02em" }}>設定</h2>
+              <button
+                onClick={() => setShowSettings(false)}
+                style={{
+                  background: "none", border: "none", fontSize: 20,
+                  cursor: "pointer", color: "var(--muted)", padding: "4px 8px",
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Settings Content */}
+            <div style={{  gap: 16, display: "flex", flexDirection: "column" }}>
+              {/* Update Button */}
+              {updateAvailable && (
+                <div style={{
+                  padding: "16px", borderRadius: 10,
+                  background: "var(--terra-dim)", border: "1px solid var(--terra)",
+                }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "var(--terra)", marginBottom: 10 }}>
+                    📦 新しいバージョンが利用可能です
+                  </div>
+                  <button
+                    onClick={() => {
+                      setShowSettings(false);
+                      handleForceUpdate();
+                    }}
+                    style={{
+                      width: "100%", padding: "12px",
+                      background: "var(--terra)", color: "#fff",
+                      border: "none", borderRadius: 7,
+                      fontSize: 13, fontWeight: 600, letterSpacing: ".06em",
+                      cursor: "pointer", transition: "opacity .2s",
+                    }}
+                    onMouseEnter={(e) => e.target.style.opacity = "0.85"}
+                    onMouseLeave={(e) => e.target.style.opacity = "1"}
+                  >
+                    アップデートを更新
+                  </button>
+                </div>
+              )}
+
+              {/* App Info */}
+              <div style={{ padding: "16px 0", borderTop: "1px solid var(--border)" }}>
+                <div style={{ fontSize: 11, color: "var(--muted)", letterSpacing: ".06em", marginBottom: 8 }}>
+                  アプリバージョン
+                </div>
+                <div style={{ fontSize: 14, fontWeight: 500, fontVariantNumeric: "tabular-nums" }}>
+                  {APP_VERSION}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Update Notification Toast */}
+      {updateAvailable && !showSettings && (
+        <div style={{
+          position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)",
+          zIndex: 998, padding: "12px 16px", borderRadius: 8,
+          background: "var(--terra)", color: "#fff",
+          fontSize: 12, fontWeight: 600, letterSpacing: ".05em",
+          boxShadow: "0 4px 12px rgba(196,97,58,.3)",
+          animation: "slideUp .3s ease",
+          cursor: "pointer",
+          maxWidth: "90vw",
+        }}
+        onClick={() => setShowSettings(true)}
+        title="設定を開く"
+        >
+          ✓ 新しいバージョンが利用可能 — タップして更新
+        </div>
+      )}
 
       <footer style={{
         padding: "24px", textAlign: "center",
