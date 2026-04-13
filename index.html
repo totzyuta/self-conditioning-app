@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
   <title>Self Conditioning App</title>
   <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
@@ -15,12 +15,17 @@
       --terra: #C4613A; --terra-dim: #FBF0EB;
       --text: #1C1C1A; --muted: #9B9890; --border: #E4E1D8;
     }
+    html, body {
+      overflow-x: hidden;
+      width: 100%;
+    }
     body {
       background: var(--bg);
       font-family: 'Hiragino Sans','Hiragino Kaku Gothic ProN','Yu Gothic Medium',
                    'Noto Sans JP',-apple-system,sans-serif;
       color: var(--text); min-height: 100vh;
       -webkit-font-smoothing: antialiased;
+      touch-action: pan-y;
     }
     input[type="range"] {
       -webkit-appearance: none; width: 100%; height: 3px;
@@ -95,7 +100,10 @@ function PasswordGate({ onAuth }) {
 
   const attempt = () => {
     if (val === PW) {
-      try { sessionStorage.setItem(AUTH_K, "1"); } catch {}
+      try {
+        const exp = Date.now() + 30 * 24 * 60 * 60 * 1000;
+        localStorage.setItem(AUTH_K, String(exp));
+      } catch {}
       onAuth();
     } else {
       setErr(true);
@@ -299,9 +307,11 @@ function todayISO() {
 
 /* ═══ Smooth SVG Line Chart ══════════════════════════════ */
 function SmoothLineChart({ points, w = 640, h = 130, showNeutral = true, color = "#2D5A27" }) {
-  // points: [{x: timestamp_ms, y: number, label: string}]
+  const [hovered, setHovered] = useState(null); // index of hovered point
+  const svgRef = useRef(null);
+
   if (!points || points.length < 1) return null;
-  const pad = { t: 18, r: 16, b: 28, l: 32 };
+  const pad = { t: 22, r: 20, b: 28, l: 32 };
   const iw = w - pad.l - pad.r;
   const ih = h - pad.t - pad.b;
 
@@ -319,7 +329,6 @@ function SmoothLineChart({ points, w = 640, h = 130, showNeutral = true, color =
 
   function catmullRom(arr) {
     if (arr.length < 2) return arr.length === 1 ? `M${arr[0].px},${arr[0].py}` : "";
-    // Monotone-friendly tension: low value prevents overshoot between sparse points
     const t = 0.12;
     let d = `M${arr[0].px},${arr[0].py}`;
     for (let i = 0; i < arr.length - 1; i++) {
@@ -334,52 +343,86 @@ function SmoothLineChart({ points, w = 640, h = 130, showNeutral = true, color =
     return d;
   }
 
+  // Find nearest point to pointer X
+  const handlePointer = (e) => {
+    const svg = svgRef.current;
+    if (!svg) return;
+    const rect = svg.getBoundingClientRect();
+    const scaleX = w / rect.width;
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const svgX = (clientX - rect.left) * scaleX;
+    let best = 0, bestDist = Infinity;
+    pts.forEach((p, i) => {
+      const d = Math.abs(p.px - svgX);
+      if (d < bestDist) { bestDist = d; best = i; }
+    });
+    setHovered(best);
+  };
+
   const linePath = catmullRom(pts);
   const last = pts[pts.length - 1];
   const areaPath = `${linePath} L${last.px},${pad.t+ih} L${pts[0].px},${pad.t+ih} Z`;
   const neutralY = toY(5.0);
 
-  // Y axis labels
   const yLabels = [];
   for (let v = Math.ceil(yMin); v <= Math.floor(yMax); v++) {
     if (v >= 0 && v <= 10) yLabels.push(v);
   }
 
+  const hp = hovered != null ? pts[hovered] : null;
+  const tooltipX = hp ? Math.min(Math.max(hp.px, pad.l + 20), pad.l + iw - 20) : 0;
+  const tooltipY = hp ? Math.max(hp.py - 26, pad.t + 2) : 0;
+
   return (
-    <svg width="100%" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="xMidYMid meet" style={{ display: "block", overflow: "visible" }}>
-      {/* Grid lines */}
+    <svg
+      ref={svgRef}
+      width="100%" viewBox={`0 0 ${w} ${h}`}
+      preserveAspectRatio="xMidYMid meet"
+      style={{ display: "block", overflow: "visible", cursor: "crosshair" }}
+      onMouseMove={handlePointer}
+      onMouseLeave={() => setHovered(null)}
+      onTouchStart={handlePointer}
+      onTouchMove={e => { e.preventDefault(); handlePointer(e); }}
+      onTouchEnd={() => setHovered(null)}
+    >
       {yLabels.map(v => (
         <line key={v} x1={pad.l} y1={toY(v)} x2={pad.l+iw} y2={toY(v)}
           stroke="#E4E1D8" strokeWidth={1} />
       ))}
-      {/* Neutral reference */}
       {showNeutral && neutralY >= pad.t && neutralY <= pad.t+ih && (
         <line x1={pad.l} y1={neutralY} x2={pad.l+iw} y2={neutralY}
           stroke="#9B9890" strokeWidth={1} strokeDasharray="4,3" opacity={0.6} />
       )}
-      {/* Area */}
       <path d={areaPath} fill={`${color}12`} />
-      {/* Line */}
       <path d={linePath} fill="none" stroke={color} strokeWidth={2.5}
         strokeLinecap="round" strokeLinejoin="round" />
-      {/* Dots */}
       {pts.map((p, i) => (
-        <g key={i}>
-          <circle cx={p.px} cy={p.py} r={5} fill={color} stroke="var(--bg)" strokeWidth={2.5} />
-          {i === pts.length - 1 && (
-            <text x={p.px} y={p.py - 9} textAnchor="middle" fontSize={9}
-              fill={color} fontWeight="600">{p.y.toFixed(1)}</text>
-          )}
-        </g>
+        <circle key={i} cx={p.px} cy={p.py}
+          r={hovered === i ? 7 : 4.5}
+          fill={hovered === i ? color : color}
+          stroke="var(--bg)" strokeWidth={2.5}
+          style={{ transition: "r .1s" }}
+        />
       ))}
-      {/* Y labels */}
       {yLabels.map(v => (
         <text key={v} x={pad.l - 5} y={toY(v) + 3.5} textAnchor="end"
           fontSize={8} fill="#9B9890">{v}</text>
       ))}
-      {/* Neutral label */}
       {showNeutral && neutralY >= pad.t && neutralY <= pad.t+ih && (
         <text x={pad.l + iw + 4} y={neutralY + 3} fontSize={8} fill="#9B9890">±0</text>
+      )}
+      {/* Hover tooltip */}
+      {hp && (
+        <g>
+          <line x1={hp.px} y1={pad.t} x2={hp.px} y2={pad.t+ih}
+            stroke={color} strokeWidth={1} strokeDasharray="3,2" opacity={0.4} />
+          <rect x={tooltipX - 22} y={tooltipY - 14} width={44} height={22}
+            rx={5} fill={color} opacity={0.92} />
+          <text x={tooltipX} y={tooltipY + 3} textAnchor="middle"
+            fontSize={11} fill="#fff" fontWeight="700">{hp.y.toFixed(1)}</text>
+          <text x={tooltipX} y={tooltipY + 16} textAnchor="middle"
+            fontSize={8} fill="#fff" opacity={0.8}>{hp.label}</text>
+        </g>
       )}
     </svg>
   );
@@ -492,17 +535,18 @@ function OSBar({ value }) {
 
 /* ═══ Dashboard ══════════════════════════════════════════ */
 function Dashboard({ logs }) {
+  const today = todayISO();
+  const logMap = {};
+  logs.forEach(l => { logMap[l.date] = l; });
+
+  // Today's record (may be null if not recorded yet)
+  const todayLog = logMap[today] || null;
+
+  // Most recent recorded session (for Latest Session card)
   const sorted = [...logs].sort((a, b) => new Date(b.date) - new Date(a.date));
-  const latest = sorted[0];
+  const latestRecorded = sorted[0] || null;
 
-  if (!latest) return (
-    <div style={{ textAlign: "center", padding: "80px 24px", color: "var(--muted)" }}>
-      <p>まだデータがありません。「記録」タブから追加してください。</p>
-    </div>
-  );
-
-  const d = fmtDate(latest.date);
-  const c = condColor(latest.condition);
+  const c = condColor(todayLog ? todayLog.condition : null);
 
   // Trend data (last 10 with condition)
   const trendData = sorted
@@ -511,13 +555,13 @@ function Dashboard({ logs }) {
     .reverse()
     .map(l => ({ x: new Date(l.date + "T00:00:00").getTime(), y: l.condition, label: fmtDate(l.date).short }));
 
-  const isRest = latest.type === "rest";
+  const isRest = todayLog ? todayLog.type === "rest" : false;
 
   return (
     <div style={{ padding: "40px 24px 48px" }}>
 
-      {/* ── Centered Date Hero ── */}
-      <DateHero dateStr={latest.date} />
+      {/* ── Centered Date Hero — always today ── */}
+      <DateHero dateStr={today} />
 
       {/* ── Condition Number ── */}
       <div style={{
@@ -533,9 +577,9 @@ function Dashboard({ logs }) {
           fontVariantNumeric: "tabular-nums",
           animation: "countUp .6s .6s cubic-bezier(.22,1,.36,1) both",
         }}>
-          {latest.condition != null ? latest.condition.toFixed(1) : "—"}
+          {todayLog && todayLog.condition != null ? todayLog.condition.toFixed(1) : "—"}
         </div>
-        {latest.condition != null && (
+        {todayLog && todayLog.condition != null ? (
           <div style={{
             display: "flex", gap: 8, alignItems: "center", justifyContent: "center", marginTop: 10,
             animation: "fadeUp .4s .75s both",
@@ -546,73 +590,81 @@ function Dashboard({ logs }) {
               fontSize: 11, fontWeight: 700,
               border: `1px solid ${c}28`,
             }}>
-              {latest.condition >= 5 ? "+" : ""}{(latest.condition - 5).toFixed(1)} OS
+              {todayLog.condition >= 5 ? "+" : ""}{(todayLog.condition - 5).toFixed(1)} OS
             </span>
-            <span style={{ fontSize: 11, color: "var(--muted)" }}>{condLabel(latest.condition)}</span>
+            <span style={{ fontSize: 11, color: "var(--muted)" }}>{condLabel(todayLog.condition)}</span>
+          </div>
+        ) : (
+          <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 10, animation: "fadeUp .4s .75s both" }}>
+            本日の記録なし
           </div>
         )}
       </div>
 
       {/* OS Bar */}
-      {latest.condition != null && (
+      {todayLog && todayLog.condition != null && (
         <div style={{ marginBottom: 36, animation: "fadeUp .4s .85s both" }}>
-          <OSBar value={latest.condition} />
+          <OSBar value={todayLog.condition} />
         </div>
       )}
 
-      {/* Latest Session Card */}
-      <div style={{
-        background: "var(--surface)", border: "1px solid var(--border)",
-        borderRadius: 10, padding: "22px 22px 18px", marginBottom: 16,
-        animation: "fadeUp .45s .95s both",
-      }}>
+      {/* Today / Latest Session Card */}
+      {latestRecorded && (
         <div style={{
-          fontSize: 9, letterSpacing: ".18em", color: "var(--muted)",
-          textTransform: "uppercase", marginBottom: 14,
-        }}>Latest Session</div>
-
-        {isRest ? (
-          <div style={{ display: "flex", alignItems: "center", gap: 10, color: "var(--muted)", fontSize: 14 }}>
-            <span style={{ fontSize: 22 }}>🌿</span>
-            <span>休息日 — {latest.remarks || "リカバリー"}</span>
-          </div>
-        ) : (
-          <>
-            {/* Main */}
-            {latest.mainWorkout && latest.mainWorkout !== "—" && (
-              <div style={{ marginBottom: 14 }}>
-                <div style={{ fontSize: 9, letterSpacing: ".15em", color: "var(--muted)", textTransform: "uppercase", marginBottom: 8 }}>Main</div>
-                <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
-                  <span style={{ fontSize: 16, fontWeight: 700, color: "var(--green)" }}>{latest.mainWorkout}</span>
-                  <span style={{ fontSize: 13, color: "var(--muted)", fontVariantNumeric: "tabular-nums" }}>{latest.weightRepSet}</span>
-                </div>
-              </div>
+          background: "var(--surface)", border: "1px solid var(--border)",
+          borderRadius: 10, padding: "22px 22px 18px", marginBottom: 16,
+          animation: "fadeUp .45s .95s both",
+        }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+            <div style={{ fontSize: 9, letterSpacing: ".18em", color: "var(--muted)", textTransform: "uppercase" }}>
+              {latestRecorded.date === today ? "Today's Session" : "Latest Session"}
+            </div>
+            {latestRecorded.date !== today && (
+              <div style={{ fontSize: 10, color: "var(--muted)" }}>{fmtDate(latestRecorded.date).short}</div>
             )}
-            {/* Sub — same design as main */}
-            {latest.subWorkout && latest.subWorkout !== "—" && latest.subWorkout !== "なし" && (
-              <div style={{ borderTop: "1px solid #F2EFE8", paddingTop: 12 }}>
-                <div style={{ fontSize: 9, letterSpacing: ".15em", color: "var(--muted)", textTransform: "uppercase", marginBottom: 8 }}>Sub</div>
-                <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
-                  <span style={{ fontSize: 16, fontWeight: 700, color: "var(--green)" }}>{latest.subWorkout.split("/")[0].trim()}</span>
-                  {latest.subWorkout.includes("/") && (
-                    <span style={{ fontSize: 13, color: "var(--muted)" }}>{latest.subWorkout.substring(latest.subWorkout.indexOf("/")+1).trim()}</span>
-                  )}
-                </div>
-              </div>
-            )}
-          </>
-        )}
-
-        {latest.remarks && (
-          <div style={{
-            marginTop: 14, padding: "10px 14px",
-            background: "#F4F3F0",
-            borderRadius: 6, fontSize: 12, color: "#666", lineHeight: 1.75,
-          }}>
-            {latest.remarks}
           </div>
-        )}
-      </div>
+
+          {latestRecorded.type === "rest" ? (
+            <div style={{ display: "flex", alignItems: "center", gap: 10, color: "var(--muted)", fontSize: 14 }}>
+              <span style={{ fontSize: 22 }}>🌿</span>
+              <span>休息日 — {latestRecorded.remarks || "リカバリー"}</span>
+            </div>
+          ) : (
+            <>
+              {latestRecorded.mainWorkout && latestRecorded.mainWorkout !== "—" && (
+                <div style={{ marginBottom: 14 }}>
+                  <div style={{ fontSize: 9, letterSpacing: ".15em", color: "var(--muted)", textTransform: "uppercase", marginBottom: 8 }}>Main</div>
+                  <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
+                    <span style={{ fontSize: 16, fontWeight: 700, color: "var(--green)" }}>{latestRecorded.mainWorkout}</span>
+                    <span style={{ fontSize: 13, color: "var(--muted)", fontVariantNumeric: "tabular-nums" }}>{latestRecorded.weightRepSet}</span>
+                  </div>
+                </div>
+              )}
+              {latestRecorded.subWorkout && latestRecorded.subWorkout !== "—" && latestRecorded.subWorkout !== "なし" && (
+                <div style={{ borderTop: "1px solid #F2EFE8", paddingTop: 12 }}>
+                  <div style={{ fontSize: 9, letterSpacing: ".15em", color: "var(--muted)", textTransform: "uppercase", marginBottom: 8 }}>Sub</div>
+                  <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
+                    <span style={{ fontSize: 16, fontWeight: 700, color: "var(--green)" }}>{latestRecorded.subWorkout.split("/")[0].trim()}</span>
+                    {latestRecorded.subWorkout.includes("/") && (
+                      <span style={{ fontSize: 13, color: "var(--muted)" }}>{latestRecorded.subWorkout.substring(latestRecorded.subWorkout.indexOf("/")+1).trim()}</span>
+                    )}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          {latestRecorded.remarks && (
+            <div style={{
+              marginTop: 14, padding: "10px 14px",
+              background: "#F4F3F0",
+              borderRadius: 6, fontSize: 12, color: "#666", lineHeight: 1.75,
+            }}>
+              {latestRecorded.remarks}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Trend Line Chart */}
       {trendData.length >= 2 && (
@@ -768,7 +820,8 @@ function ConditionTab({ logs, onUpdateCondition }) {
         {/* Date */}
         <div style={{ marginBottom: 24 }}>
           <div style={LABEL_S}>日付</div>
-          <input type="date" value={date} onChange={e => setDate(e.target.value)} />
+          <input type="date" value={date} onChange={e => setDate(e.target.value)}
+            style={{ maxWidth: "100%", boxSizing: "border-box" }} />
           {existingCond != null && (
             <div style={{ marginTop: 6, fontSize: 11, color: "var(--muted)" }}>
               この日の記録: <span style={{ color: condColor(existingCond), fontWeight: 700 }}>{existingCond.toFixed(1)}</span>（上書き可）
@@ -827,9 +880,34 @@ function History({ logs }) {
   const [filter, setFilter] = useState("all");
   const [expanded, setExpanded] = useState(new Set());
 
-  const sorted = [...logs].sort((a, b) => new Date(b.date) - new Date(a.date));
+  // Build a complete day-by-day list from earliest log to today
+  const today = todayISO();
+  const logMap = {};
+  logs.forEach(l => { logMap[l.date] = l; });
 
-  const filtered = sorted.filter(l => {
+  const allDates = useMemo(() => {
+    const dates = [];
+    if (!logs.length) return dates;
+    const earliest = logs.reduce((a, b) => a.date < b.date ? a : b).date;
+    let cur = new Date(earliest + "T00:00:00");
+    const end = new Date(today + "T00:00:00");
+    while (cur <= end) {
+      const iso = `${cur.getFullYear()}-${String(cur.getMonth()+1).padStart(2,'0')}-${String(cur.getDate()).padStart(2,'0')}`;
+      if (logMap[iso]) {
+        dates.push(logMap[iso]);
+      } else {
+        dates.push({
+          id: `gap_${iso}`, date: iso, condition: null,
+          type: "rest", mainWorkout: "—", weightRepSet: "—",
+          subWorkout: "—", remarks: "",
+        });
+      }
+      cur.setDate(cur.getDate() + 1);
+    }
+    return dates.reverse(); // newest first
+  }, [logs, today]);
+
+  const filtered = allDates.filter(l => {
     if (filter === "all")      return true;
     if (filter === "training") return l.type === "training";
     if (filter === "rest")     return l.type === "rest";
@@ -1139,7 +1217,10 @@ const TABS = [
 
 function App() {
   const [authed, setAuthed] = useState(() => {
-    try { return sessionStorage.getItem(AUTH_K) === "1"; } catch { return false; }
+    try {
+      const exp = parseInt(localStorage.getItem(AUTH_K) || "0", 10);
+      return exp > Date.now();
+    } catch { return false; }
   });
   const [hiding, setHiding] = useState(false);
   const [logs, setLogs] = useState(() => {
