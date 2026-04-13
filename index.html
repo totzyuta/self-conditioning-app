@@ -1436,34 +1436,45 @@ function App() {
 
             {/* Settings Content */}
             <div style={{  gap: 16, display: "flex", flexDirection: "column" }}>
-              {/* Update Button */}
-              {updateAvailable && (
+              {/* Update Status */}
+              <div style={{
+                padding: "16px", borderRadius: 10,
+                background: updateAvailable ? "var(--terra-dim)" : "#EAF2E9",
+                border: `1px solid ${updateAvailable ? "var(--terra)" : "var(--green)"}`,
+              }}>
                 <div style={{
-                  padding: "16px", borderRadius: 10,
-                  background: "var(--terra-dim)", border: "1px solid var(--terra)",
+                  fontSize: 13, fontWeight: 600,
+                  color: updateAvailable ? "var(--terra)" : "var(--green)",
+                  marginBottom: 10
                 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "var(--terra)", marginBottom: 10 }}>
-                    📦 新しいバージョンが利用可能です
-                  </div>
-                  <button
-                    onClick={() => {
-                      setShowSettings(false);
-                      handleForceUpdate();
-                    }}
-                    style={{
-                      width: "100%", padding: "12px",
-                      background: "var(--terra)", color: "#fff",
-                      border: "none", borderRadius: 7,
-                      fontSize: 13, fontWeight: 600, letterSpacing: ".06em",
-                      cursor: "pointer", transition: "opacity .2s",
-                    }}
-                    onMouseEnter={(e) => e.target.style.opacity = "0.85"}
-                    onMouseLeave={(e) => e.target.style.opacity = "1"}
-                  >
-                    アップデートを更新
-                  </button>
+                  {updateAvailable ? "📦 新しいバージョンが利用可能です" : "✓ すでに最新版です"}
                 </div>
-              )}
+                <button
+                  onClick={() => {
+                    setShowSettings(false);
+                    handleForceUpdate();
+                  }}
+                  disabled={!updateAvailable}
+                  style={{
+                    width: "100%", padding: "12px",
+                    background: updateAvailable ? "var(--terra)" : "#D0CDC5",
+                    color: updateAvailable ? "#fff" : "var(--muted)",
+                    border: "none", borderRadius: 7,
+                    fontSize: 13, fontWeight: 600, letterSpacing: ".06em",
+                    cursor: updateAvailable ? "pointer" : "not-allowed",
+                    transition: "opacity .2s",
+                    opacity: updateAvailable ? 1 : 0.6,
+                  }}
+                  onMouseEnter={(e) => {
+                    if (updateAvailable) e.target.style.opacity = "0.85";
+                  }}
+                  onMouseLeave={(e) => {
+                    if (updateAvailable) e.target.style.opacity = "1";
+                  }}
+                >
+                  {updateAvailable ? "アップデートを更新" : "アップデート確認済み"}
+                </button>
+              </div>
 
               {/* App Info */}
               <div style={{ padding: "16px 0", borderTop: "1px solid var(--border)" }}>
