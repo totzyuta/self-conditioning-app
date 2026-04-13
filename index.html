@@ -1141,13 +1141,17 @@ function App() {
   const [authed, setAuthed] = useState(() => {
     try { return sessionStorage.getItem(AUTH_K) === "1"; } catch { return false; }
   });
+  const [hiding, setHiding] = useState(false);
   const [logs, setLogs] = useState(() => {
     try { const s = localStorage.getItem(SK); if (s) return JSON.parse(s); } catch {}
     return INITIAL_LOGS;
   });
   const [tab, setTab] = useState("dashboard");
 
-  if (!authed) return <PasswordGate onAuth={() => setAuthed(true)} />;
+  const handleAuth = () => {
+    setHiding(true);
+    setTimeout(() => setAuthed(true), 350);
+  };
 
   useEffect(() => {
     try { localStorage.setItem(SK, JSON.stringify(logs)); } catch {}
@@ -1178,6 +1182,18 @@ function App() {
 
   return (
     <div style={{ maxWidth: 700, margin: "0 auto", minHeight: "100vh" }}>
+
+      {/* Password overlay — stays mounted until fade-out completes */}
+      {!authed && (
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 1000,
+          opacity: hiding ? 0 : 1,
+          transition: "opacity .35s ease",
+          pointerEvents: hiding ? "none" : "auto",
+        }}>
+          <PasswordGate onAuth={handleAuth} />
+        </div>
+      )}
 
       {/* Header */}
       <header style={{
