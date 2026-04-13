@@ -586,7 +586,7 @@ function ConditionChartCard({ logs, defaultPeriod = "1m", height = 140, showReco
           </div>
           <div style={{ marginBottom: 18 }}>
             <input type="date" value={date} onChange={e => setDate(e.target.value)}
-              style={{ maxWidth: "100%", boxSizing: "border-box" }} />
+              style={{ width: "100%", boxSizing: "border-box", padding: "8px" }} />
             {existingCond != null && (
               <div style={{ marginTop: 5, fontSize: 11, color: "var(--muted)" }}>
                 記録済み: <span style={{ color: condColor(existingCond), fontWeight: 700 }}>{existingCond.toFixed(1)}</span>（上書き可）
