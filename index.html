@@ -370,13 +370,32 @@ function SmoothLineChart({ points, w = 640, h = 130, showNeutral = true, color =
   }
 
   const hp = hovered != null ? pts[hovered] : null;
-  const tooltipX = hp ? Math.min(Math.max(hp.px, pad.l + 20), pad.l + iw - 20) : 0;
-  const tooltipY = hp ? Math.max(hp.py - 26, pad.t + 2) : 0;
+  const tooltipX = hp ? Math.min(Math.max(hp.px, pad.l + 24), pad.l + iw - 24) : 0;
+  const tooltipY = hp ? Math.max(hp.py - 28, pad.t + 2) : 0;
+
+  // Date labels: show up to ~6 evenly-spaced labels along x axis
+  const dateLabels = [];
+  if (showDateLabels && pts.length >= 2) {
+    const step = Math.max(1, Math.ceil(pts.length / 6));
+    pts.forEach((p, i) => {
+      if (i === 0 || i === pts.length - 1 || i % step === 0) {
+        dateLabels.push(p);
+      }
+    });
+    // deduplicate by index
+    const seen = new Set();
+    const deduped = dateLabels.filter(p => {
+      if (seen.has(p.px)) return false;
+      seen.add(p.px); return true;
+    });
+    dateLabels.length = 0;
+    deduped.forEach(p => dateLabels.push(p));
+  }
 
   return (
     <svg
       ref={svgRef}
-      width="100%" viewBox={`0 0 ${w} ${h}`}
+      width="100%" viewBox={`0 0 ${w} ${h + (showDateLabels ? 14 : 0)}`}
       preserveAspectRatio="xMidYMid meet"
       style={{ display: "block", overflow: "visible", cursor: "crosshair" }}
       onMouseMove={handlePointer}
@@ -398,9 +417,8 @@ function SmoothLineChart({ points, w = 640, h = 130, showNeutral = true, color =
         strokeLinecap="round" strokeLinejoin="round" />
       {pts.map((p, i) => (
         <circle key={i} cx={p.px} cy={p.py}
-          r={hovered === i ? 7 : 4.5}
-          fill={hovered === i ? color : color}
-          stroke="var(--bg)" strokeWidth={2.5}
+          r={hovered === i ? 7 : 4}
+          fill={color} stroke="var(--bg)" strokeWidth={2.5}
           style={{ transition: "r .1s" }}
         />
       ))}
@@ -411,15 +429,20 @@ function SmoothLineChart({ points, w = 640, h = 130, showNeutral = true, color =
       {showNeutral && neutralY >= pad.t && neutralY <= pad.t+ih && (
         <text x={pad.l + iw + 4} y={neutralY + 3} fontSize={8} fill="#9B9890">±0</text>
       )}
+      {/* Date labels along x axis */}
+      {showDateLabels && dateLabels.map((p, i) => (
+        <text key={i} x={p.px} y={pad.t + ih + 13}
+          textAnchor="middle" fontSize={8} fill="#9B9890">{p.label}</text>
+      ))}
       {/* Hover tooltip */}
       {hp && (
         <g>
           <line x1={hp.px} y1={pad.t} x2={hp.px} y2={pad.t+ih}
-            stroke={color} strokeWidth={1} strokeDasharray="3,2" opacity={0.4} />
-          <rect x={tooltipX - 22} y={tooltipY - 14} width={44} height={22}
-            rx={5} fill={color} opacity={0.92} />
+            stroke={color} strokeWidth={1} strokeDasharray="3,2" opacity={0.35} />
+          <rect x={tooltipX - 24} y={tooltipY - 14} width={48} height={24}
+            rx={5} fill={color} opacity={0.93} />
           <text x={tooltipX} y={tooltipY + 3} textAnchor="middle"
-            fontSize={11} fill="#fff" fontWeight="700">{hp.y.toFixed(1)}</text>
+            fontSize={12} fill="#fff" fontWeight="700">{hp.y.toFixed(1)}</text>
           <text x={tooltipX} y={tooltipY + 16} textAnchor="middle"
             fontSize={8} fill="#fff" opacity={0.8}>{hp.label}</text>
         </g>
@@ -428,45 +451,173 @@ function SmoothLineChart({ points, w = 640, h = 130, showNeutral = true, color =
   );
 }
 
-/* ═══ Date Hero (centered, typographic) ═════════════════ */
-function DateHero({ dateStr }) {
+/* ═══ Date Header (compact, subdued) ════════════════════ */
+function DateHeader({ dateStr }) {
   const d = fmtDate(dateStr);
   return (
-    <div style={{ textAlign: "center", userSelect: "none" }}>
-      {/* Year / Month — muted label */}
-      <div style={{
-        fontSize: 10, letterSpacing: ".32em", color: "var(--muted)",
-        textTransform: "uppercase", marginBottom: 8,
-        animation: "fadeDown .4s .05s both",
-      }}>
-        {d.year} · {d.month}
-      </div>
-
-      {/* Giant day number */}
-      <div style={{
-        fontSize: 120, fontWeight: 100, lineHeight: .9,
-        color: "var(--green)", letterSpacing: "-8px",
+    <div style={{
+      display: "flex", alignItems: "baseline", gap: 10,
+      justifyContent: "center",
+      animation: "fadeDown .4s .05s both",
+      userSelect: "none",
+    }}>
+      <span style={{
+        fontSize: 13, color: "var(--muted)", letterSpacing: ".06em",
         fontVariantNumeric: "tabular-nums",
-        animation: "countUp .65s .1s cubic-bezier(.22,1,.36,1) both",
       }}>
-        {String(d.day).padStart(2, "0")}
+        {d.month} {d.day}日
+      </span>
+      <span style={{ fontSize: 10, color: "#C8C4BC", letterSpacing: ".12em" }}>
+        {d.wdJA}曜日
+      </span>
+    </div>
+  );
+}
+
+/* ═══ Condition Chart Card (shared module) ═══════════════ */
+const PERIODS = [
+  { key: "1w", label: "1W", days: 7 },
+  { key: "1m", label: "1M", days: 30 },
+  { key: "3m", label: "3M", days: 90 },
+  { key: "6m", label: "6M", days: 180 },
+  { key: "1y", label: "1Y", days: 365 },
+];
+
+function ConditionChartCard({ logs, defaultPeriod = "1m", height = 140, showRecord = false, onUpdateCondition }) {
+  const [period, setPeriod]   = useState(defaultPeriod);
+  const [date, setDate]       = useState(todayISO());
+  const [cond, setCond]       = useState(5.0);
+  const [saved, setSaved]     = useState(false);
+
+  useEffect(() => {
+    const found = logs.find(l => l.date === date);
+    setCond(found && found.condition != null ? found.condition : 5.0);
+  }, [date, logs]);
+
+  const periodDays = PERIODS.find(p => p.key === period).days;
+  const cutoff = Date.now() - periodDays * 86400000;
+
+  const chartPoints = useMemo(() => {
+    return logs
+      .filter(l => l.condition != null && new Date(l.date + "T00:00:00").getTime() >= cutoff)
+      .sort((a, b) => new Date(a.date) - new Date(b.date))
+      .map(l => ({ x: new Date(l.date + "T00:00:00").getTime(), y: l.condition, label: fmtDate(l.date).short }));
+  }, [logs, period]);
+
+  const withCond = chartPoints.map(p => p.y);
+  const avg  = withCond.length ? (withCond.reduce((a,b)=>a+b,0)/withCond.length) : null;
+  const maxV = withCond.length ? Math.max(...withCond) : null;
+  const minV = withCond.length ? Math.min(...withCond) : null;
+
+  const existing    = logs.find(l => l.date === date);
+  const existingCond = existing ? existing.condition : null;
+  const cv = parseFloat(cond);
+  const cc = condColor(cv);
+  const pct = (cv / 10) * 100;
+
+  const handleSave = () => {
+    if (onUpdateCondition) {
+      onUpdateCondition(date, cv);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    }
+  };
+
+  return (
+    <div style={{
+      background: "var(--surface)", border: "1px solid var(--border)",
+      borderRadius: 10, padding: "18px 18px 12px",
+    }}>
+      {/* Header row */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, gap: 8 }}>
+        <div style={{ fontSize: 9, letterSpacing: ".18em", color: "var(--muted)", textTransform: "uppercase", whiteSpace: "nowrap" }}>
+          コンディション推移
+        </div>
+        {/* Period selector — wraps on very narrow screens */}
+        <div style={{ display: "flex", gap: 3, flexWrap: "nowrap" }}>
+          {PERIODS.map(p => (
+            <button key={p.key} onClick={() => setPeriod(p.key)} style={{
+              background: period === p.key ? "var(--green)" : "none",
+              color: period === p.key ? "#fff" : "var(--muted)",
+              border: `1px solid ${period === p.key ? "var(--green)" : "var(--border)"}`,
+              borderRadius: 4, padding: "4px 7px",
+              fontSize: 9, fontWeight: 700, letterSpacing: ".04em",
+              minWidth: 28, textAlign: "center",
+              transition: "all .15s",
+            }}>
+              {p.label}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {/* Weekday */}
-      <div style={{
-        marginTop: 14, fontSize: 11, fontWeight: 500,
-        letterSpacing: ".25em", color: "var(--muted)", textTransform: "uppercase",
-        animation: "fadeUp .4s .3s both",
-      }}>
-        {d.wdEN}
-      </div>
+      {chartPoints.length >= 2 ? (
+        <>
+          <SmoothLineChart points={chartPoints} h={height} showNeutral={true} showDateLabels={true} />
+          {/* Stats row */}
+          <div style={{ display: "flex", borderTop: "1px solid var(--border)", marginTop: 12 }}>
+            {[
+              { label: "平均", val: avg != null ? avg.toFixed(2) : "—" },
+              { label: "最高", val: maxV != null ? maxV.toFixed(1) : "—" },
+              { label: "最低", val: minV != null ? minV.toFixed(1) : "—" },
+              { label: "記録", val: withCond.length },
+            ].map((s, i) => (
+              <div key={i} style={{
+                flex: 1, textAlign: "center", padding: "10px 4px",
+                borderRight: i < 3 ? "1px solid var(--border)" : "none",
+              }}>
+                <div style={{ fontSize: 9, color: "var(--muted)", letterSpacing: ".08em", marginBottom: 3 }}>{s.label}</div>
+                <div style={{ fontSize: 15, fontWeight: 300, color: "var(--green)", letterSpacing: "-0.5px" }}>{s.val}</div>
+              </div>
+            ))}
+          </div>
+        </>
+      ) : (
+        <div style={{ textAlign: "center", padding: "32px 0", color: "var(--muted)", fontSize: 12 }}>
+          この期間のコンディションデータがありません
+        </div>
+      )}
 
-      {/* Divider */}
-      <div style={{
-        width: 36, height: 1, background: "var(--border)",
-        margin: "18px auto 0",
-        animation: "fadeIn .5s .45s both",
-      }} />
+      {/* Optional record form */}
+      {showRecord && (
+        <div style={{ borderTop: "1px solid var(--border)", marginTop: 16, paddingTop: 18 }}>
+          <div style={{ fontSize: 10, letterSpacing: ".15em", color: "var(--muted)", textTransform: "uppercase", marginBottom: 14 }}>
+            記録する
+          </div>
+          <div style={{ marginBottom: 18 }}>
+            <input type="date" value={date} onChange={e => setDate(e.target.value)}
+              style={{ maxWidth: "100%", boxSizing: "border-box" }} />
+            {existingCond != null && (
+              <div style={{ marginTop: 5, fontSize: 11, color: "var(--muted)" }}>
+                記録済み: <span style={{ color: condColor(existingCond), fontWeight: 700 }}>{existingCond.toFixed(1)}</span>（上書き可）
+              </div>
+            )}
+          </div>
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 10 }}>
+              <span style={{ fontSize: 9, letterSpacing: ".15em", color: "var(--muted)", textTransform: "uppercase" }}>コンディション</span>
+              <span style={{ fontSize: 24, fontWeight: 100, color: cc, letterSpacing: "-1px", fontVariantNumeric: "tabular-nums" }}>{cv.toFixed(1)}</span>
+              <span style={{ fontSize: 9, color: cc, fontWeight: 700 }}>{cv >= 5 ? "+" : ""}{(cv-5).toFixed(1)}</span>
+            </div>
+            <input type="range" min="0" max="10" step="0.1" value={cond}
+              onChange={e => setCond(e.target.value)}
+              style={{ background: `linear-gradient(to right, ${cc} ${pct}%, var(--border) ${pct}%)` }}
+            />
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: "var(--muted)", marginTop: 4 }}>
+              <span>0</span><span>NEUTRAL 5.0</span><span>10</span>
+            </div>
+          </div>
+          <button onClick={handleSave} style={{
+            width: "100%", padding: "12px",
+            background: saved ? "var(--green)" : "var(--terra)",
+            color: "#fff", border: "none", borderRadius: 7,
+            fontSize: 13, fontWeight: 600, letterSpacing: ".06em",
+            transition: "background .35s",
+          }}>
+            {saved ? "✓  保存しました" : "記録する"}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -533,338 +684,128 @@ function OSBar({ value }) {
   );
 }
 
-/* ═══ Dashboard ══════════════════════════════════════════ */
-function Dashboard({ logs }) {
-  const today = todayISO();
-  const logMap = {};
-  logs.forEach(l => { logMap[l.date] = l; });
-
-  // Today's record (may be null if not recorded yet)
-  const todayLog = logMap[today] || null;
-
-  // Most recent recorded session (for Latest Session card)
-  const sorted = [...logs].sort((a, b) => new Date(b.date) - new Date(a.date));
-  const latestRecorded = sorted[0] || null;
-
-  const c = condColor(todayLog ? todayLog.condition : null);
-
-  // Trend data (last 10 with condition)
-  const trendData = sorted
-    .filter(l => l.condition != null)
-    .slice(0, 10)
-    .reverse()
-    .map(l => ({ x: new Date(l.date + "T00:00:00").getTime(), y: l.condition, label: fmtDate(l.date).short }));
-
-  const isRest = todayLog ? todayLog.type === "rest" : false;
-
+/* ═══ Session Mini Card ═════════════════════════════════ */
+function SessionMiniCard({ log, label }) {
+  if (!log) return null;
+  const isRest = log.type === "rest";
+  const d = fmtDate(log.date);
   return (
-    <div style={{ padding: "40px 24px 48px" }}>
-
-      {/* ── Centered Date Hero — always today ── */}
-      <DateHero dateStr={today} />
-
-      {/* ── Condition Number ── */}
-      <div style={{
-        textAlign: "center", marginTop: 32, marginBottom: 8,
-        animation: "fadeUp .5s .55s both",
-      }}>
-        <div style={{ fontSize: 10, letterSpacing: ".28em", color: "var(--muted)", textTransform: "uppercase", marginBottom: 12 }}>
-          Condition
-        </div>
-        <div style={{
-          fontSize: 88, fontWeight: 100, color: c,
-          lineHeight: 1, letterSpacing: "-6px",
-          fontVariantNumeric: "tabular-nums",
-          animation: "countUp .6s .6s cubic-bezier(.22,1,.36,1) both",
-        }}>
-          {todayLog && todayLog.condition != null ? todayLog.condition.toFixed(1) : "—"}
-        </div>
-        {todayLog && todayLog.condition != null ? (
-          <div style={{
-            display: "flex", gap: 8, alignItems: "center", justifyContent: "center", marginTop: 10,
-            animation: "fadeUp .4s .75s both",
-          }}>
-            <span style={{
-              padding: "4px 12px", borderRadius: 100,
-              background: `${c}15`, color: c,
-              fontSize: 11, fontWeight: 700,
-              border: `1px solid ${c}28`,
-            }}>
-              {todayLog.condition >= 5 ? "+" : ""}{(todayLog.condition - 5).toFixed(1)} OS
-            </span>
-            <span style={{ fontSize: 11, color: "var(--muted)" }}>{condLabel(todayLog.condition)}</span>
-          </div>
-        ) : (
-          <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 10, animation: "fadeUp .4s .75s both" }}>
-            本日の記録なし
-          </div>
-        )}
+    <div style={{ paddingBottom: 14, marginBottom: 14, borderBottom: "1px solid #F0EDE7" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+        <div style={{ fontSize: 9, letterSpacing: ".15em", color: "var(--muted)", textTransform: "uppercase" }}>{label}</div>
+        <div style={{ fontSize: 10, color: "var(--muted)" }}>{d.month}{d.day}日（{d.wdJA}）</div>
       </div>
-
-      {/* OS Bar */}
-      {todayLog && todayLog.condition != null && (
-        <div style={{ marginBottom: 36, animation: "fadeUp .4s .85s both" }}>
-          <OSBar value={todayLog.condition} />
+      {isRest ? (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--muted)", fontSize: 13 }}>
+          <span>🌿</span>
+          <span>休息 {log.remarks ? `— ${log.remarks.slice(0, 30)}${log.remarks.length > 30 ? "…" : ""}` : ""}</span>
         </div>
-      )}
-
-      {/* Today / Latest Session Card */}
-      {latestRecorded && (
-        <div style={{
-          background: "var(--surface)", border: "1px solid var(--border)",
-          borderRadius: 10, padding: "22px 22px 18px", marginBottom: 16,
-          animation: "fadeUp .45s .95s both",
-        }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-            <div style={{ fontSize: 9, letterSpacing: ".18em", color: "var(--muted)", textTransform: "uppercase" }}>
-              {latestRecorded.date === today ? "Today's Session" : "Latest Session"}
-            </div>
-            {latestRecorded.date !== today && (
-              <div style={{ fontSize: 10, color: "var(--muted)" }}>{fmtDate(latestRecorded.date).short}</div>
-            )}
-          </div>
-
-          {latestRecorded.type === "rest" ? (
-            <div style={{ display: "flex", alignItems: "center", gap: 10, color: "var(--muted)", fontSize: 14 }}>
-              <span style={{ fontSize: 22 }}>🌿</span>
-              <span>休息日 — {latestRecorded.remarks || "リカバリー"}</span>
-            </div>
-          ) : (
-            <>
-              {latestRecorded.mainWorkout && latestRecorded.mainWorkout !== "—" && (
-                <div style={{ marginBottom: 14 }}>
-                  <div style={{ fontSize: 9, letterSpacing: ".15em", color: "var(--muted)", textTransform: "uppercase", marginBottom: 8 }}>Main</div>
-                  <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
-                    <span style={{ fontSize: 16, fontWeight: 700, color: "var(--green)" }}>{latestRecorded.mainWorkout}</span>
-                    <span style={{ fontSize: 13, color: "var(--muted)", fontVariantNumeric: "tabular-nums" }}>{latestRecorded.weightRepSet}</span>
-                  </div>
-                </div>
-              )}
-              {latestRecorded.subWorkout && latestRecorded.subWorkout !== "—" && latestRecorded.subWorkout !== "なし" && (
-                <div style={{ borderTop: "1px solid #F2EFE8", paddingTop: 12 }}>
-                  <div style={{ fontSize: 9, letterSpacing: ".15em", color: "var(--muted)", textTransform: "uppercase", marginBottom: 8 }}>Sub</div>
-                  <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
-                    <span style={{ fontSize: 16, fontWeight: 700, color: "var(--green)" }}>{latestRecorded.subWorkout.split("/")[0].trim()}</span>
-                    {latestRecorded.subWorkout.includes("/") && (
-                      <span style={{ fontSize: 13, color: "var(--muted)" }}>{latestRecorded.subWorkout.substring(latestRecorded.subWorkout.indexOf("/")+1).trim()}</span>
-                    )}
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-
-          {latestRecorded.remarks && (
-            <div style={{
-              marginTop: 14, padding: "10px 14px",
-              background: "#F4F3F0",
-              borderRadius: 6, fontSize: 12, color: "#666", lineHeight: 1.75,
-            }}>
-              {latestRecorded.remarks}
+      ) : (
+        <div>
+          {log.mainWorkout && log.mainWorkout !== "—" && (
+            <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap", marginBottom: log.subWorkout && log.subWorkout !== "—" && log.subWorkout !== "なし" ? 6 : 0 }}>
+              <span style={{ fontSize: 15, fontWeight: 700, color: "var(--green)" }}>{log.mainWorkout}</span>
+              <span style={{ fontSize: 12, color: "var(--muted)", fontVariantNumeric: "tabular-nums" }}>{log.weightRepSet}</span>
             </div>
           )}
-        </div>
-      )}
-
-      {/* Trend Line Chart */}
-      {trendData.length >= 2 && (
-        <div style={{
-          background: "var(--surface)", border: "1px solid var(--border)",
-          borderRadius: 10, padding: "20px 20px 14px",
-          animation: "fadeUp .45s 1.05s both",
-        }}>
-          <div style={{ fontSize: 9, letterSpacing: ".18em", color: "var(--muted)", textTransform: "uppercase", marginBottom: 12 }}>
-            Condition Trend
-          </div>
-          <SmoothLineChart points={trendData} h={110} showNeutral={true} />
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: "var(--muted)", marginTop: 6, padding: "0 32px 0 32px" }}>
-            <span>{trendData[0].label}</span>
-            <span>{trendData[trendData.length-1].label}</span>
-          </div>
+          {log.subWorkout && log.subWorkout !== "—" && log.subWorkout !== "なし" && (
+            <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>Sub: {log.subWorkout}</div>
+          )}
         </div>
       )}
     </div>
   );
 }
 
-/* ═══ Condition Tab ══════════════════════════════════════ */
-const PERIODS = [
-  { key: "1w", label: "1週間", days: 7 },
-  { key: "1m", label: "1ヶ月", days: 30 },
-  { key: "3m", label: "3ヶ月", days: 90 },
-  { key: "6m", label: "6ヶ月", days: 180 },
-  { key: "1y", label: "1年",   days: 365 },
-];
+/* ═══ Dashboard ══════════════════════════════════════════ */
+function Dashboard({ logs }) {
+  const today = todayISO();
+  const logMap = {};
+  logs.forEach(l => { logMap[l.date] = l; });
 
-function ConditionTab({ logs, onUpdateCondition }) {
-  const [period, setPeriod] = useState("1m");
-  const [date, setDate]     = useState(todayISO());
-  const [cond, setCond]     = useState(5.0);
-  const [saved, setSaved]   = useState(false);
+  const todayLog = logMap[today] || null;
+  const c = condColor(todayLog ? todayLog.condition : null);
 
-  // Sync slider when date changes
-  useEffect(() => {
-    const found = logs.find(l => l.date === date);
-    if (found && found.condition != null) {
-      setCond(found.condition);
-    } else {
-      setCond(5.0);
-    }
-  }, [date, logs]);
-
-  const periodDays = PERIODS.find(p => p.key === period).days;
-  const cutoff = Date.now() - periodDays * 86400000;
-
-  const chartPoints = useMemo(() => {
-    return logs
-      .filter(l => l.condition != null && new Date(l.date + "T00:00:00").getTime() >= cutoff)
-      .sort((a, b) => new Date(a.date) - new Date(b.date))
-      .map(l => ({
-        x: new Date(l.date + "T00:00:00").getTime(),
-        y: l.condition,
-        label: fmtDate(l.date).short,
-      }));
-  }, [logs, period]);
-
-  // Find existing entry for selected date
-  const existing = logs.find(l => l.date === date);
-  const existingCond = existing ? existing.condition : null;
-
-  const handleSave = () => {
-    onUpdateCondition(date, parseFloat(cond));
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
-  };
-
-  const cv = parseFloat(cond);
-  const cc = condColor(cv);
-  const pct = (cv / 10) * 100;
-
-  // Summary stats for period
-  const withCond = chartPoints.map(p => p.y);
-  const avg = withCond.length ? (withCond.reduce((a,b) => a+b, 0) / withCond.length) : null;
-  const maxV = withCond.length ? Math.max(...withCond) : null;
-  const minV = withCond.length ? Math.min(...withCond) : null;
+  // Find today and yesterday's recorded sessions
+  const sorted = [...logs].sort((a, b) => new Date(b.date) - new Date(a.date));
+  const recentSessions = sorted.filter(l => l.type === "training" || (l.type === "rest" && l.mainWorkout && l.mainWorkout !== "—")).slice(0, 2);
 
   return (
-    <div className="fade-up" style={{ padding: "28px 24px 56px" }}>
+    <div style={{ padding: "32px 24px 48px" }}>
 
-      {/* Graph section */}
-      <div style={{
-        background: "var(--surface)", border: "1px solid var(--border)",
-        borderRadius: 10, padding: "20px 20px 12px", marginBottom: 24,
-      }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, letterSpacing: ".03em" }}>
-            コンディション推移
-          </div>
-          {/* Period selector */}
-          <div style={{ display: "flex", gap: 2 }}>
-            {PERIODS.map(p => (
-              <button key={p.key} onClick={() => setPeriod(p.key)} style={{
-                background: period === p.key ? "var(--green)" : "none",
-                color: period === p.key ? "#fff" : "var(--muted)",
-                border: "1px solid",
-                borderColor: period === p.key ? "var(--green)" : "var(--border)",
-                borderRadius: 4, padding: "4px 8px",
-                fontSize: 10, fontWeight: 600, letterSpacing: ".05em",
-                transition: "all .15s",
-              }}>
-                {p.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {chartPoints.length >= 2 ? (
-          <>
-            <SmoothLineChart points={chartPoints} h={140} showNeutral={true} />
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: "var(--muted)", marginTop: 4, padding: "0 30px" }}>
-              <span>{chartPoints[0].label}</span>
-              <span>{chartPoints[chartPoints.length-1].label}</span>
-            </div>
-            {/* Stats */}
-            <div style={{ display: "flex", gap: 0, borderTop: "1px solid var(--border)", marginTop: 14 }}>
-              {[
-                { label: "平均", val: avg != null ? avg.toFixed(2) : "—" },
-                { label: "最高", val: maxV != null ? maxV.toFixed(1) : "—" },
-                { label: "最低", val: minV != null ? minV.toFixed(1) : "—" },
-                { label: "記録数", val: withCond.length },
-              ].map((s, i) => (
-                <div key={i} style={{
-                  flex: 1, textAlign: "center", padding: "12px 8px",
-                  borderRight: i < 3 ? "1px solid var(--border)" : "none",
-                }}>
-                  <div style={{ fontSize: 9, color: "var(--muted)", letterSpacing: ".1em", marginBottom: 4 }}>{s.label}</div>
-                  <div style={{ fontSize: 16, fontWeight: 300, color: "var(--green)", letterSpacing: "-0.5px" }}>{s.val}</div>
-                </div>
-              ))}
-            </div>
-          </>
-        ) : (
-          <div style={{ textAlign: "center", padding: "40px 0", color: "var(--muted)", fontSize: 13 }}>
-            この期間のコンディションデータがありません
-          </div>
-        )}
+      {/* ── Date — compact, subdued ── */}
+      <div style={{ marginBottom: 20 }}>
+        <DateHeader dateStr={today} />
       </div>
 
-      {/* Record section */}
+      {/* ── Condition: main hero ── */}
       <div style={{
-        background: "var(--surface)", border: "1px solid var(--border)",
-        borderRadius: 10, padding: "22px",
+        textAlign: "center", marginBottom: 28,
+        animation: "fadeUp .5s .2s both",
       }}>
-        <div style={{ fontSize: 13, fontWeight: 600, letterSpacing: ".03em", marginBottom: 22 }}>
-          コンディションを記録
+        <div style={{ fontSize: 9, letterSpacing: ".28em", color: "var(--muted)", textTransform: "uppercase", marginBottom: 10 }}>
+          Condition
         </div>
-
-        {/* Date */}
-        <div style={{ marginBottom: 24 }}>
-          <div style={LABEL_S}>日付</div>
-          <input type="date" value={date} onChange={e => setDate(e.target.value)}
-            style={{ maxWidth: "100%", boxSizing: "border-box" }} />
-          {existingCond != null && (
-            <div style={{ marginTop: 6, fontSize: 11, color: "var(--muted)" }}>
-              この日の記録: <span style={{ color: condColor(existingCond), fontWeight: 700 }}>{existingCond.toFixed(1)}</span>（上書き可）
-            </div>
+        <div style={{
+          fontSize: 104, fontWeight: 100, color: c,
+          lineHeight: 1, letterSpacing: "-7px",
+          fontVariantNumeric: "tabular-nums",
+          animation: "countUp .6s .3s cubic-bezier(.22,1,.36,1) both",
+        }}>
+          {todayLog && todayLog.condition != null ? todayLog.condition.toFixed(1) : "—"}
+        </div>
+        <div style={{ marginTop: 10, animation: "fadeUp .4s .5s both" }}>
+          {todayLog && todayLog.condition != null ? (
+            <span style={{ fontSize: 12, color: c }}>{condLabel(todayLog.condition)}</span>
+          ) : (
+            <span style={{ fontSize: 11, color: "var(--muted)" }}>本日の記録なし</span>
           )}
         </div>
-
-        {/* Slider */}
-        <div style={{ marginBottom: 28 }}>
-          <div style={{ ...LABEL_S, display: "flex", alignItems: "baseline", gap: 10 }}>
-            <span>コンディション</span>
-            <span style={{ fontSize: 26, fontWeight: 100, color: cc, letterSpacing: "-1.5px", fontVariantNumeric: "tabular-nums" }}>
-              {cv.toFixed(1)}
-            </span>
-            <span style={{ fontSize: 10, color: cc, fontWeight: 700, padding: "2px 8px", borderRadius: 100, background: `${cc}15`, border: `1px solid ${cc}30` }}>
-              {cv >= 5 ? "+" : ""}{(cv-5).toFixed(1)} OS
-            </span>
-          </div>
-          <div style={{ padding: "10px 0" }}>
-            <input type="range" min="0" max="10" step="0.1"
-              value={cond}
-              onChange={e => setCond(e.target.value)}
-              style={{ background: `linear-gradient(to right, ${cc} ${pct}%, var(--border) ${pct}%)` }}
-            />
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: "var(--muted)", marginTop: 5 }}>
-              <span>0  LOW</span>
-              <span>◆ NEUTRAL 5.0</span>
-              <span>HIGH  10</span>
-            </div>
-          </div>
-        </div>
-
-        <button onClick={handleSave} style={{
-          width: "100%", padding: "13px",
-          background: saved ? "var(--green)" : "var(--terra)",
-          color: "#fff", border: "none", borderRadius: 7,
-          fontSize: 14, fontWeight: 600, letterSpacing: ".06em",
-          transition: "background .35s",
-          boxShadow: `0 3px 12px ${saved ? "rgba(45,90,39,.25)" : "rgba(196,97,58,.25)"}`,
-        }}>
-          {saved ? "✓  保存しました" : "記録する"}
-        </button>
       </div>
+
+      {/* OS Bar */}
+      {todayLog && todayLog.condition != null && (
+        <div style={{ marginBottom: 28, animation: "fadeUp .4s .6s both" }}>
+          <OSBar value={todayLog.condition} />
+        </div>
+      )}
+
+      {/* ── Recent Sessions (today + yesterday) ── */}
+      {recentSessions.length > 0 && (
+        <div style={{
+          background: "var(--surface)", border: "1px solid var(--border)",
+          borderRadius: 10, padding: "18px 20px 4px", marginBottom: 16,
+          animation: "fadeUp .45s .7s both",
+        }}>
+          {recentSessions.map((log, i) => (
+            <SessionMiniCard
+              key={log.id}
+              log={log}
+              label={log.date === today ? "Today" : i === 0 ? "Latest" : "Previous"}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* ── Condition Trend (shared module) ── */}
+      <div style={{ animation: "fadeUp .45s .8s both" }}>
+        <ConditionChartCard logs={logs} defaultPeriod="1m" height={110} />
+      </div>
+    </div>
+  );
+}
+
+/* ═══ Condition Tab ══════════════════════════════════════ */
+function ConditionTab({ logs, onUpdateCondition }) {
+  return (
+    <div className="fade-up" style={{ padding: "28px 24px 56px" }}>
+      <ConditionChartCard
+        logs={logs}
+        defaultPeriod="1m"
+        height={140}
+        showRecord={true}
+        onUpdateCondition={onUpdateCondition}
+      />
     </div>
   );
 }
@@ -878,6 +819,7 @@ const FILTERS = [
 
 function History({ logs }) {
   const [filter, setFilter] = useState("all");
+  const [monthFilter, setMonthFilter] = useState("all");
   const [expanded, setExpanded] = useState(new Set());
 
   // Build a complete day-by-day list from earliest log to today
@@ -907,8 +849,23 @@ function History({ logs }) {
     return dates.reverse(); // newest first
   }, [logs, today]);
 
+  // Available months derived from allDates (newest first)
+  const availableMonths = useMemo(() => {
+    const seen = new Set();
+    const months = [];
+    allDates.forEach(l => {
+      const ym = l.date.slice(0, 7); // "YYYY-MM"
+      if (!seen.has(ym)) {
+        seen.add(ym);
+        const [y, m] = ym.split("-");
+        months.push({ key: ym, label: `${y}年${parseInt(m)}月` });
+      }
+    });
+    return months;
+  }, [allDates]);
+
   const filtered = allDates.filter(l => {
-    if (filter === "all")      return true;
+    if (monthFilter !== "all" && !l.date.startsWith(monthFilter)) return false;
     if (filter === "training") return l.type === "training";
     if (filter === "rest")     return l.type === "rest";
     return true;
@@ -925,8 +882,34 @@ function History({ logs }) {
         <span style={{ fontSize: 11, color: "var(--muted)" }}>{filtered.length} entries</span>
       </div>
 
-      {/* Filter */}
-      <div style={{ display: "flex", gap: 6, padding: "14px 24px", overflowX: "auto" }}>
+      {/* Month filter */}
+      <div style={{ display: "flex", gap: 6, padding: "14px 24px 0", overflowX: "auto" }}>
+        <button onClick={() => setMonthFilter("all")} style={{
+          background: monthFilter === "all" ? "var(--terra)" : "none",
+          color: monthFilter === "all" ? "#fff" : "var(--muted)",
+          border: "1px solid",
+          borderColor: monthFilter === "all" ? "var(--terra)" : "var(--border)",
+          borderRadius: 100, padding: "4px 12px",
+          fontSize: 10, fontWeight: 600, whiteSpace: "nowrap",
+          transition: "all .15s",
+        }}>全期間</button>
+        {availableMonths.map(m => (
+          <button key={m.key} onClick={() => setMonthFilter(m.key)} style={{
+            background: monthFilter === m.key ? "var(--terra)" : "none",
+            color: monthFilter === m.key ? "#fff" : "var(--muted)",
+            border: "1px solid",
+            borderColor: monthFilter === m.key ? "var(--terra)" : "var(--border)",
+            borderRadius: 100, padding: "4px 12px",
+            fontSize: 10, fontWeight: 600, whiteSpace: "nowrap",
+            transition: "all .15s",
+          }}>
+            {m.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Type filter */}
+      <div style={{ display: "flex", gap: 6, padding: "10px 24px", overflowX: "auto" }}>
         {FILTERS.map(f => (
           <button key={f.key} onClick={() => setFilter(f.key)} style={{
             background: filter === f.key ? "var(--green)" : "none",
