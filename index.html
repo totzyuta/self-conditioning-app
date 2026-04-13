@@ -1454,25 +1454,19 @@ function App() {
                     setShowSettings(false);
                     handleForceUpdate();
                   }}
-                  disabled={!updateAvailable}
                   style={{
                     width: "100%", padding: "12px",
-                    background: updateAvailable ? "var(--terra)" : "#D0CDC5",
-                    color: updateAvailable ? "#fff" : "var(--muted)",
+                    background: updateAvailable ? "var(--terra)" : "var(--green)",
+                    color: "#fff",
                     border: "none", borderRadius: 7,
                     fontSize: 13, fontWeight: 600, letterSpacing: ".06em",
-                    cursor: updateAvailable ? "pointer" : "not-allowed",
+                    cursor: "pointer",
                     transition: "opacity .2s",
-                    opacity: updateAvailable ? 1 : 0.6,
                   }}
-                  onMouseEnter={(e) => {
-                    if (updateAvailable) e.target.style.opacity = "0.85";
-                  }}
-                  onMouseLeave={(e) => {
-                    if (updateAvailable) e.target.style.opacity = "1";
-                  }}
+                  onMouseEnter={(e) => e.target.style.opacity = "0.85"}
+                  onMouseLeave={(e) => e.target.style.opacity = "1"}
                 >
-                  {updateAvailable ? "アップデートを更新" : "アップデート確認済み"}
+                  {updateAvailable ? "アップデートを更新" : "最新版を確認"}
                 </button>
               </div>
 
