@@ -37,7 +37,9 @@
       touch-action: pan-y;
     }
     input[type="range"] {
-      -webkit-appearance: none; width: 100%; height: 3px;
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%; height: 3px;
       border-radius: 2px; outline: none; cursor: pointer;
     }
     input[type="range"]::-webkit-slider-thumb {
@@ -94,7 +96,7 @@
 const { useState, useEffect, useCallback, useMemo, useRef } = React;
 
 /* ═══ App Version ═══════════════════════════════════════  */
-const APP_VERSION = "v1.0.3";
+const APP_VERSION = "v1.0.4";
 
 /* ═══ Storage ═══════════════════════════════════════════ */
 const SK     = "phl_tracker_v1";
@@ -962,17 +964,180 @@ function ConditionTab({ logs, onUpdateCondition }) {
   );
 }
 
-/* ═══ History / Notes Tab ════════════════════════════════ */
+/* ═══ Training Tab (formerly Notes) ══════════════════════ */
 const FILTERS = [
   { key: "all",      label: "全て" },
   { key: "training", label: "トレーニング" },
   { key: "rest",     label: "休息" },
 ];
 
-function History({ logs }) {
+function parseExStr(str) {
+  const s = (str || "").trim();
+  if (!s || s === "—" || s === "なし") return [{ name: "", weight: "", reps: "" }];
+  return s.split(" / ").map(seg => {
+    const t = seg.trim();
+    // Try to parse: "NAME WEIGHT (REPS)"
+    const m = t.match(/^(.*?)(?:\s+([^\s(]+))?(?:\s+\(([^)]+)\))?\s*$/);
+    const name = (m?.[1] || "").trim();
+    const weight = (m?.[2] || "").trim();
+    const reps = (m?.[3] || "").trim();
+    return { name, weight, reps };
+  }).filter(e => e.name || e.weight || e.reps).concat([{ name: "", weight: "", reps: "" }]).slice(0, 8);
+}
+
+function TrainingRecordScreen({ onClose, onSubmit, logs, initialDate, editLog }) {
+  const [date, setDate] = useState(initialDate || todayISO());
+  const [mainExs, setMainExs] = useState([{ name: "", weight: "", reps: "" }]);
+  const [subExs, setSubExs]   = useState([{ name: "", weight: "", reps: "" }]);
+  const [note, setNote]       = useState("");
+  const [saved, setSaved]     = useState(false);
+
+  useEffect(() => {
+    const d = (editLog?.date || initialDate || todayISO());
+    setDate(d);
+    const existing = editLog || logs.find(l => l.date === d) || null;
+    setMainExs(parseExStr(existing?.mainWorkout || ""));
+    setSubExs(parseExStr(existing?.subWorkout || ""));
+    setNote(existing?.remarks || "");
+    setSaved(false);
+  }, [editLog, initialDate, logs]);
+
+  const updMain = (i, k, v) => setMainExs(a => { const n=[...a]; n[i]={...n[i],[k]:v}; return n; });
+  const updSub  = (i, k, v) => setSubExs(a  => { const n=[...a]; n[i]={...n[i],[k]:v}; return n; });
+
+  const buildExStr = (exs) => exs.filter(e=>e.name.trim()).map(e=>{
+    const parts = [e.name.trim()];
+    if (e.weight.trim()) parts.push(e.weight.trim());
+    if (e.reps.trim()) parts.push(`(${e.reps.trim()})`);
+    return parts.join(" ");
+  }).join(" / ");
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    const existing = logs.find(l => l.date === date) || null;
+    const keepCond = (existing && existing.condition != null) ? existing.condition : null;
+
+    const mainStr = buildExStr(mainExs) || "—";
+    const subStr  = buildExStr(subExs)  || "—";
+    const wrs = mainExs.filter(ex=>ex.name.trim()).map(ex=>`${ex.weight} (${ex.reps})`).join(" / ");
+
+    onSubmit({
+      id: (existing?.id && !String(existing.id).startsWith("gap_")) ? existing.id : Date.now().toString(),
+      date,
+      condition: keepCond,
+      type: "training",
+      mainWorkout: mainStr,
+      weightRepSet: wrs || existing?.weightRepSet || "—",
+      subWorkout: subStr,
+      remarks: note,
+    });
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
+  return (
+    <div className="fade-up" style={{ padding: "18px 16px 56px" }}>
+      <div style={{
+        background: "var(--surface)",
+        border: "1px solid var(--border)",
+        borderRadius: 14,
+        padding: "18px 18px 22px",
+        boxShadow: "0 6px 26px rgba(0,0,0,.06)",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 14 }}>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              background: "none",
+              border: "1px solid var(--border)",
+              color: "var(--muted)",
+              padding: "7px 10px",
+              borderRadius: 10,
+              fontSize: 11,
+              fontWeight: 800,
+              letterSpacing: ".04em",
+              whiteSpace: "nowrap",
+            }}
+            title="一覧に戻る"
+          >
+            ← 戻る
+          </button>
+          <h2 style={{ flex: 1, textAlign: "center", fontSize: 14, fontWeight: 800, letterSpacing: ".02em" }}>
+            {editLog ? "トレーニングを編集" : "トレーニングを記録"}
+          </h2>
+          <div style={{ width: 70 }} />
+        </div>
+
+        <form onSubmit={handleSubmit}>
+          {/* Date */}
+          <div style={{ marginBottom: 18, overflow: "hidden" }}>
+            <div style={LABEL_S}>日付</div>
+            <input
+              type="date"
+              value={date}
+              onChange={e => setDate(e.target.value)}
+              required
+              style={{ width: "100%", boxSizing: "border-box", padding: "7px 6px", fontSize: "16px" }}
+            />
+          </div>
+
+          {/* Main exercises */}
+          <div style={{ marginBottom: 18 }}>
+            <div style={LABEL_S}>メイン種目</div>
+            {mainExs.map((ex, i) => (
+              <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 76px 100px", gap: 6, marginBottom: 6 }}>
+                <input type="text" placeholder="種目名 (例: BP)" value={ex.name} onChange={e => updMain(i,"name",e.target.value)} />
+                <input type="text" placeholder="重量" value={ex.weight} onChange={e => updMain(i,"weight",e.target.value)} />
+                <input type="text" placeholder="回数 7,6,4" value={ex.reps} onChange={e => updMain(i,"reps",e.target.value)} />
+              </div>
+            ))}
+            <AddBtn onClick={() => setMainExs(a => [...a, {name:"",weight:"",reps:""}])} label="+ 種目を追加" />
+          </div>
+
+          {/* Sub exercises */}
+          <div style={{ marginBottom: 18 }}>
+            <div style={LABEL_S}>サブ種目</div>
+            {subExs.map((ex, i) => (
+              <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 76px 100px", gap: 6, marginBottom: 6 }}>
+                <input type="text" placeholder="種目名 (例: DBP)" value={ex.name} onChange={e => updSub(i,"name",e.target.value)} />
+                <input type="text" placeholder="重量" value={ex.weight} onChange={e => updSub(i,"weight",e.target.value)} />
+                <input type="text" placeholder="回数 9,8,7" value={ex.reps} onChange={e => updSub(i,"reps",e.target.value)} />
+              </div>
+            ))}
+            <AddBtn onClick={() => setSubExs(a => [...a, {name:"",weight:"",reps:""}])} label="+ 種目を追加" />
+          </div>
+
+          {/* Note */}
+          <div style={{ marginBottom: 20 }}>
+            <div style={LABEL_S}>メモ・備考</div>
+            <textarea placeholder="気づいたこと、体の状態など..." value={note} onChange={e => setNote(e.target.value)} />
+          </div>
+
+          <button type="submit" style={{
+            width: "100%", padding: "14px",
+            background: saved ? "var(--green)" : "var(--terra)",
+            color: "#fff", border: "none", borderRadius: 7,
+            fontSize: 14, fontWeight: 600, letterSpacing: ".07em",
+            transition: "background .35s",
+            boxShadow: `0 3px 14px ${saved ? "rgba(45,90,39,.25)" : "rgba(196,97,58,.25)"}`,
+          }}>
+            {saved ? "✓  保存しました" : "記録する"}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function TrainingTab({ logs, onUpsert }) {
   const [filter, setFilter] = useState("all");
   const [monthFilter, setMonthFilter] = useState("all");
   const [expanded, setExpanded] = useState(new Set());
+  const [openRec, setOpenRec] = useState(false);
+  const [editLog, setEditLog] = useState(null);
+  const [initialDate, setInitialDate] = useState(todayISO());
+  const [selectedMonth, setSelectedMonth] = useState(() => todayISO().slice(0, 7)); // "YYYY-MM"
 
   // Build a complete day-by-day list from earliest log to today
   const today = todayISO();
@@ -1016,6 +1181,20 @@ function History({ logs }) {
     return months;
   }, [allDates]);
 
+  const minMonth = availableMonths.length ? availableMonths[availableMonths.length - 1].key : undefined;
+  const maxMonth = availableMonths.length ? availableMonths[0].key : undefined;
+
+  // Keep month picker value within available range
+  useEffect(() => {
+    if (!minMonth || !maxMonth) return;
+    setSelectedMonth(prev => {
+      if (!prev) return maxMonth;
+      if (prev < minMonth) return minMonth;
+      if (prev > maxMonth) return maxMonth;
+      return prev;
+    });
+  }, [minMonth, maxMonth]);
+
   const filtered = allDates.filter(l => {
     if (monthFilter !== "all" && !l.date.startsWith(monthFilter)) return false;
     if (filter === "training") return l.type === "training";
@@ -1027,37 +1206,85 @@ function History({ logs }) {
     const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n;
   });
 
+  if (openRec) {
+    return (
+      <TrainingRecordScreen
+        onClose={() => setOpenRec(false)}
+        onSubmit={(log) => { onUpsert(log); setOpenRec(false); }}
+        logs={logs}
+        initialDate={initialDate}
+        editLog={editLog}
+      />
+    );
+  }
+
   return (
     <div className="fade-up" style={{ paddingBottom: 48 }}>
       <div style={{ padding: "24px 24px 0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h2 style={{ fontSize: 13, fontWeight: 600, letterSpacing: ".05em" }}>トレーニングノート</h2>
-        <span style={{ fontSize: 11, color: "var(--muted)" }}>{filtered.length} entries</span>
+        <h2 style={{ fontSize: 13, fontWeight: 600, letterSpacing: ".05em" }}>トレーニング</h2>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ fontSize: 11, color: "var(--muted)" }}>{filtered.length} entries</span>
+          <button
+            onClick={() => { setEditLog(null); setInitialDate(todayISO()); setOpenRec(true); }}
+            style={{
+              background: "var(--terra)", color: "#fff", border: "none",
+              padding: "8px 12px", borderRadius: 9, fontSize: 11, fontWeight: 700,
+              letterSpacing: ".06em", boxShadow: "0 3px 14px rgba(196,97,58,.22)",
+            }}
+            title="トレーニングを記録"
+          >
+            記録する
+          </button>
+        </div>
       </div>
 
       {/* Month filter */}
-      <div style={{ display: "flex", gap: 6, padding: "14px 24px 0", overflowX: "auto" }}>
-        <button onClick={() => setMonthFilter("all")} style={{
-          background: monthFilter === "all" ? "var(--terra)" : "none",
-          color: monthFilter === "all" ? "#fff" : "var(--muted)",
-          border: "1px solid",
-          borderColor: monthFilter === "all" ? "var(--terra)" : "var(--border)",
-          borderRadius: 100, padding: "4px 12px",
-          fontSize: 10, fontWeight: 600, whiteSpace: "nowrap",
-          transition: "all .15s",
-        }}>全期間</button>
-        {availableMonths.map(m => (
-          <button key={m.key} onClick={() => setMonthFilter(m.key)} style={{
-            background: monthFilter === m.key ? "var(--terra)" : "none",
-            color: monthFilter === m.key ? "#fff" : "var(--muted)",
+      <div style={{ display: "flex", gap: 10, padding: "14px 24px 0", alignItems: "center" }}>
+        <button
+          onClick={() => setMonthFilter("all")}
+          style={{
+            background: monthFilter === "all" ? "var(--terra)" : "none",
+            color: monthFilter === "all" ? "#fff" : "var(--muted)",
             border: "1px solid",
-            borderColor: monthFilter === m.key ? "var(--terra)" : "var(--border)",
-            borderRadius: 100, padding: "4px 12px",
-            fontSize: 10, fontWeight: 600, whiteSpace: "nowrap",
+            borderColor: monthFilter === "all" ? "var(--terra)" : "var(--border)",
+            borderRadius: 100,
+            padding: "4px 12px",
+            fontSize: 10,
+            fontWeight: 700,
+            whiteSpace: "nowrap",
             transition: "all .15s",
-          }}>
-            {m.label}
-          </button>
-        ))}
+          }}
+        >
+          全期間
+        </button>
+
+        <div style={{ display: "flex" }}>
+          <input
+            type="month"
+            value={monthFilter === "all" ? selectedMonth : monthFilter}
+            min={minMonth}
+            max={maxMonth}
+            onChange={(e) => {
+              const v = e.target.value; // "YYYY-MM" or ""
+              if (!v) return;
+              setSelectedMonth(v);
+              setMonthFilter(v);
+            }}
+            style={{
+              width: 150,
+              padding: "5px 12px",
+              borderRadius: 100,
+              border: "1px solid var(--border)",
+              background: "var(--bg)",
+              color: "var(--muted)",
+              fontSize: 11,
+              fontWeight: 600,
+              letterSpacing: ".02em",
+              outline: "none",
+            }}
+            title="年月で絞り込み"
+          />
+        </div>
       </div>
 
       {/* Type filter */}
@@ -1096,8 +1323,22 @@ function History({ logs }) {
               const hasNote = log.remarks && log.remarks.length > 0;
               const isLong = log.remarks && log.remarks.length > 28;
 
+              const openEdit = () => {
+                setEditLog(log.mainWorkout && log.mainWorkout !== "—" ? log : { ...log, type: "training" });
+                setInitialDate(log.date);
+                setOpenRec(true);
+              };
+
               return (
-                <tr key={log.id} style={{ animation: `rowIn .3s ease ${Math.min(idx,8)*.04}s both` }}>
+                <tr
+                  key={log.id}
+                  onClick={openEdit}
+                  style={{
+                    animation: `rowIn .3s ease ${Math.min(idx,8)*.04}s both`,
+                    cursor: "pointer",
+                  }}
+                  title="タップで編集"
+                >
                   <td>
                     <div style={{ fontVariantNumeric: "tabular-nums", fontWeight: 700, fontSize: 13 }}>{d.short}</div>
                     <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 1 }}>{d.wdJA}</div>
@@ -1133,7 +1374,11 @@ function History({ logs }) {
                   </td>
                   <td>
                     {hasNote ? (
-                      <div onClick={() => isLong && toggle(log.id)} style={{ cursor: isLong ? "pointer" : "default" }}>
+                      <div
+                        onClick={(e) => { e.stopPropagation(); isLong && toggle(log.id); }}
+                        style={{ cursor: isLong ? "pointer" : "default" }}
+                        title={isLong ? "タップで展開/折りたたみ" : undefined}
+                      >
                         <div style={{
                           fontSize: 11, color: "#555", lineHeight: 1.65,
                           display: isExp ? "block" : "-webkit-box",
@@ -1347,8 +1592,7 @@ function RecordForm({ onSubmit, logs }) {
 const TABS = [
   { id: "dashboard",  label: "ダッシュボード" },
   { id: "condition",  label: "コンディション" },
-  { id: "history",    label: "ノート" },
-  { id: "record",     label: "記録" },
+  { id: "training",   label: "トレーニング" },
 ];
 
 function App() {
@@ -1492,7 +1736,7 @@ function App() {
       if (idx >= 0) { const n=[...prev]; n[idx]=log; return n; }
       return [...prev, log];
     });
-    setTab("history");
+    setTab("training");
   }, []);
 
   const updateCondition = useCallback((date, value) => {
@@ -1612,8 +1856,7 @@ function App() {
       <main>
         {tab === "dashboard" && <Dashboard key="db" logs={logs} />}
         {tab === "condition" && <ConditionTab key="cond" logs={logs} onUpdateCondition={updateCondition} />}
-        {tab === "history"   && <History key="hist" logs={logs} />}
-        {tab === "record"    && <RecordForm key="rec" onSubmit={addLog} logs={logs} />}
+        {tab === "training"  && <TrainingTab key="train" logs={logs} onUpsert={addLog} />}
       </main>
 
       {/* Settings Modal */}
