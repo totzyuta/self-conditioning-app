@@ -1,22 +1,4 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
-  <title>Self Conditioning App</title>
-
-  <!-- PWA Manifest & Metadata -->
-  <link rel="manifest" href="/manifest.json" />
-  <meta name="theme-color" content="#2D5A27" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Conditioning" />
-  <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect fill='%232D5A27' width='180' height='180'/><text x='50%' y='50%' font-size='90' font-weight='bold' fill='white' text-anchor='middle' dominant-baseline='central' font-family='system-ui'>◆</text></svg>" />
-  <script type="module" src="/src/main.jsx"></script>
-</head>
-<body>
-<div id="root"></div>
-<!-- React app mounts here -->
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 /* ═══ App Version ═══════════════════════════════════════  */
 const APP_VERSION = "v1.0.5";
@@ -116,14 +98,14 @@ function parseWeightRepSetMetrics(wrs) {
   const isWeightTok = (tok) => {
     if (!tok) return false;
     if (tok.includes("kg")) return true;
-    if (/^\d+(\.\d+)?$/.test(tok)) return true;
+    if (/^\\d+(\\.\\d+)?$/.test(tok)) return true;
     if (tok === "自重" || tok === "膝コロ" || tok.includes("バンド") || tok.includes("🟣")) return true;
     return false;
   };
 
   segs.forEach(s => {
     const t = s.trim();
-    const m = t.match(/^\(([^)]+)\)$/);
+    const m = t.match(/^\\(([^)]+)\\)$/);
     if (!sets && m) { sets = (m[1] || "").trim(); return; }
     if (!weight && isWeightTok(t)) { weight = t; return; }
     notes.push(t);
@@ -142,13 +124,13 @@ function normalizeExerciseSegment(seg) {
   let note = "";
 
   // Prefer "(...)" as sets only when it looks like sets/reps info (numbers, commas, * or seconds).
-  const parenAll = Array.from(raw.matchAll(/\(([^)]+)\)/g));
+  const parenAll = Array.from(raw.matchAll(/\\(([^)]+)\\)/g));
   const pickSets = (s) => {
     const t = (s || "").trim();
     if (!t) return false;
     if (/[0-9]/.test(t)) return true;
     if (t.includes(",") || t.includes("*") || t.includes("×")) return true;
-    if (/^\s*\d+(\.\d+)?s\s*$/i.test(t)) return true;
+    if (/^\\s*\\d+(\\.\\d+)?s\\s*$/i.test(t)) return true;
     if (t.endsWith("s")) return true; // e.g. "3s"
     return false;
   };
@@ -162,13 +144,13 @@ function normalizeExerciseSegment(seg) {
   }
 
   const withoutParen = rawForParse.trim();
-  const parts = withoutParen.split(/\s+/).filter(Boolean);
+  const parts = withoutParen.split(/\\s+/).filter(Boolean);
 
   // Heuristic: last "kg/number/selfweight/band" token is weight, everything else tends to be name+note
   const isWeightTok = (tok) => {
     if (!tok) return false;
     if (tok.includes("kg")) return true;
-    if (/^\d+(\.\d+)?$/.test(tok)) return true;
+    if (/^\\d+(\\.\\d+)?$/.test(tok)) return true;
     if (tok === "自重" || tok === "膝コロ" || tok.includes("バンド") || tok.includes("🟣")) return true;
     return false;
   };
@@ -251,10 +233,10 @@ function normalizeLogsLocalOnly(logs) {
       const wrSegs = splitSlash(base.weightRepSet);
       const wrSeemsJustMetrics = wrSegs.every(s => {
         const t = s.trim();
-        if (/^\(([^)]+)\)$/.test(t)) return true;
+        if (/^\\(([^)]+)\\)$/.test(t)) return true;
         if (t.includes("kg")) return true;
-        if (/^\d+(\.\d+)?$/.test(t)) return true;
-        if (/^\d+(\.\d+)?s$/i.test(t)) return true;
+        if (/^\\d+(\\.\\d+)?$/.test(t)) return true;
+        if (/^\\d+(\\.\\d+)?s$/i.test(t)) return true;
         if (t === "自重" || t === "膝コロ" || t.includes("バンド") || t.includes("🟣")) return true;
         // If it contains kanji/kana/letters, it's probably a name/note segment
         return false;
@@ -294,7 +276,7 @@ function normalizeLogsLocalOnly(logs) {
           .join(" / ") || "—"
       : (base.weightRepSet || "—");
 
-    const newRemarks = [base.remarks, movedNotes.join("\n")].filter(s => (s || "").trim()).join("\n");
+    const newRemarks = [base.remarks, movedNotes.join("\\n")].filter(s => (s || "").trim()).join("\\n");
 
     const next = {
       ...base,
@@ -442,32 +424,32 @@ function PasswordGate({ onAuth }) {
 
 /* ═══ Seed Data ═════════════════════════════════════════ */
 const SEED_RAW = [
-  {"date":"2026-02-14","condition":null,"mainWorkout":"プロジェクト設定","weightRepSet":"—","subWorkout":"—","remarks":"トレーニングノートの出力ルールを「2週間分の表形式 / コンディション・重量・回数・セット項目」に固定することを決定。Body Beauty Project本格始動。"},
-  {"date":"2026-02-23","condition":null,"mainWorkout":"SQ (スクワット)","weightRepSet":"52.5kg / PB更新","subWorkout":"コンパウンド種目中心","remarks":"スクワットで自己ベストを更新。2月中旬から下旬にかけて45kgから52.5kgまで重量を伸ばすことに成功。"},
-  {"date":"2026-02-26","condition":null,"mainWorkout":"ディロード開始","weightRepSet":"—","subWorkout":"ダンベル種目中心","remarks":"中枢神経系の疲労を感じたため、強度を落としたディロード期間へ移行。技術練習と回復を優先。"},
-  {"date":"2026-02-27","condition":null,"mainWorkout":"DBP / DF","weightRepSet":"DBP 8kg (10*3) / DF 8kg (10*3)","subWorkout":"技術練習","remarks":"低負荷のダンベル種目で胸の収縮を確認。肩や手首の違和感に対応。"},
-  {"date":"2026-02-28","condition":null,"mainWorkout":"Active Recovery","weightRepSet":"8,000-10,000 steps","subWorkout":"Walking","remarks":"神経系回復のためのウォーキング。グリップ調整などの技術的な確認のみ実施。"},
-  {"date":"2026-03-03","condition":null,"mainWorkout":"IDC / サイドレイズ","weightRepSet":"IDC 8kg (10*3) / SR 7kg (10*3)","subWorkout":"なし","remarks":"ジム復帰初日。「握らない」意識でリハビリ。左腕に顕著な疲労の左右差（デバッグが必要）。"},
-  {"date":"2026-03-07","condition":null,"mainWorkout":"完全休息","weightRepSet":"—","subWorkout":"—","remarks":"休み切りフェーズ。身体の信号を優先し、リカバリーに専念。"},
-  {"date":"2026-03-11","condition":4.5,"mainWorkout":"休息","weightRepSet":"—","subWorkout":"—","remarks":"ニュートラル（5.0）まであと一息。翌日3/12からの本格再開に向けてOSを安定させる。"},
-  {"date":"2026-03-12","condition":4.8,"mainWorkout":"BP (ベンチプレス)","weightRepSet":"40kg / (10, 10, 9) / 3s","subWorkout":"BB-Curl 20kg (7,7,6)","remarks":"かなり久しぶりのトレーニング。やっとやっと、回復して来た気がする。ベンチプレスで、かなり回復。"},
-  {"date":"2026-03-13","condition":5.2,"mainWorkout":"休息","weightRepSet":"—","subWorkout":"—","remarks":"5の大台を突破。OS安定。"},
-  {"date":"2026-03-14","condition":5.6,"mainWorkout":"Home (アブローラー)","weightRepSet":"自重 / (10, 7, 6) / 3s","subWorkout":"なし","remarks":"アブローラー（膝コロ）。2セット目の粘り増。上昇気流。"},
-  {"date":"2026-03-15","condition":5.2,"mainWorkout":"RDL (ルーマニアンデッドリフト)","weightRepSet":"26.5kg / (10, 10, 8) / 3s","subWorkout":"バックエクステンション (7/7/7)","remarks":"メインをSQからRDLへ変更。大臀筋下部重視。"},
-  {"date":"2026-03-17","condition":null,"mainWorkout":"Home (アブローラー)","weightRepSet":"自重 / (6, 6, 6) / 3s","subWorkout":"なし","remarks":"アブローラー（膝コロ）。"},
-  {"date":"2026-03-18","condition":null,"mainWorkout":"PU (懸垂)","weightRepSet":"🟣バンド / (10, 7, 6) / 3s","subWorkout":"LPD 30kg (10*3) / DL 9kg (10/15)","remarks":"背中の感覚はまだ。二頭筋に熱感がある。"},
-  {"date":"2026-03-20","condition":5.3,"mainWorkout":"休息","weightRepSet":"—","subWorkout":"—","remarks":"背中にしっかり筋肉痛！嬉しい。胸の肩側の付け根や三頭筋にも心地よい張り。"},
-  {"date":"2026-03-21","condition":6.0,"mainWorkout":"BP (ベンチプレス)","weightRepSet":"45kg / (5, 5, 5) / 3s","subWorkout":"SC 15kg (10*3) / IC 9kg (10,7,7)","remarks":"BP 45kg初挑戦完遂。腕のボリュームも狙った構成。コンディション6.0到達！"},
-  {"date":"2026-03-22","condition":null,"mainWorkout":"Home (アブローラー)","weightRepSet":"自重 / (7, 7, 6) / 3s","subWorkout":"なし","remarks":"アブローラー（膝コロ）。"},
-  {"date":"2026-03-23","condition":null,"mainWorkout":"Home (アブローラー)","weightRepSet":"自重 / (7, 7, 7) / 3s","subWorkout":"なし","remarks":"アブローラー（膝コロ）。7回3セットで安定。"},
-  {"date":"2026-03-24","condition":null,"mainWorkout":"RDL (ルーマニアンデッドリフト)","weightRepSet":"25kg / (10, 10, 10) / 3s","subWorkout":"バックエクステンション (10, 10, 10)","remarks":"RDL 25kgで完遂。バックエクステンションも10回3セット。"},
-  {"date":"2026-03-25","condition":5.5,"mainWorkout":"休息","weightRepSet":"—","subWorkout":"—","remarks":"4日連続稼働後のOS確認。5.0以上をキープしており良好。"},
-  {"date":"2026-03-26","condition":null,"mainWorkout":"PU (懸垂)","weightRepSet":"🟣バンド / (10, 10, 10) / 3s","subWorkout":"LPD (10*3) / BP 40kg (9,10,6) / DL 10kg (10*3)","remarks":"懸垂10回3セット完遂。BP強化のため、サブ日に軽重量で組み込むテスト。"},
-  {"date":"2026-03-30","condition":5.6,"mainWorkout":"Home (アブローラー)","weightRepSet":"自重 / (7, 6, 6) / 3s","subWorkout":"なし","remarks":"アブローラー（膝コロ）。高コンディションを維持しつつ再始動。"},
-  {"date":"2026-04-02","condition":4.8,"mainWorkout":"休息","weightRepSet":"—","subWorkout":"—","remarks":"コンディション 4.8。少し落ち着いた数値。"},
-  {"date":"2026-04-06","condition":5.3,"mainWorkout":"休息","weightRepSet":"—","subWorkout":"—","remarks":"コンディション5.3まで上昇。エネルギーが戻ってきた感覚。"},
-  {"date":"2026-04-09","condition":null,"mainWorkout":"PU (懸垂) / RDL","weightRepSet":"懸垂 (8, 7, 6) / RDL 30kg (7, 7, 7)","subWorkout":"LPD (3s) / DL 10kg (10, 10, 10)","remarks":"RDLを30kgに増量。背面全体の出力を強化。"},
-  {"date":"2026-04-12","condition":6.1,"mainWorkout":"BP (ベンチプレス)","weightRepSet":"45kg / (7, 6, 4) / 3s","subWorkout":"DBP 14kg (9, 8, 7) / DF 8kg (9)","remarks":"BP 1セット目自己ベスト更新。DF 2セット目から左手首の痛みにより中断。要デバッグ。コンディション最高値。"}
+  {\"date\":\"2026-02-14\",\"condition\":null,\"mainWorkout\":\"プロジェクト設定\",\"weightRepSet\":\"—\",\"subWorkout\":\"—\",\"remarks\":\"トレーニングノートの出力ルールを「2週間分の表形式 / コンディション・重量・回数・セット項目」に固定することを決定。Body Beauty Project本格始動。\"},
+  {\"date\":\"2026-02-23\",\"condition\":null,\"mainWorkout\":\"SQ (スクワット)\",\"weightRepSet\":\"52.5kg / PB更新\",\"subWorkout\":\"コンパウンド種目中心\",\"remarks\":\"スクワットで自己ベストを更新。2月中旬から下旬にかけて45kgから52.5kgまで重量を伸ばすことに成功。\"},
+  {\"date\":\"2026-02-26\",\"condition\":null,\"mainWorkout\":\"ディロード開始\",\"weightRepSet\":\"—\",\"subWorkout\":\"ダンベル種目中心\",\"remarks\":\"中枢神経系の疲労を感じたため、強度を落としたディロード期間へ移行。技術練習と回復を優先。\"},
+  {\"date\":\"2026-02-27\",\"condition\":null,\"mainWorkout\":\"DBP / DF\",\"weightRepSet\":\"DBP 8kg (10*3) / DF 8kg (10*3)\",\"subWorkout\":\"技術練習\",\"remarks\":\"低負荷のダンベル種目で胸の収縮を確認。肩や手首の違和感に対応。\"},
+  {\"date\":\"2026-02-28\",\"condition\":null,\"mainWorkout\":\"Active Recovery\",\"weightRepSet\":\"8,000-10,000 steps\",\"subWorkout\":\"Walking\",\"remarks\":\"神経系回復のためのウォーキング。グリップ調整などの技術的な確認のみ実施。\"},
+  {\"date\":\"2026-03-03\",\"condition\":null,\"mainWorkout\":\"IDC / サイドレイズ\",\"weightRepSet\":\"IDC 8kg (10*3) / SR 7kg (10*3)\",\"subWorkout\":\"なし\",\"remarks\":\"ジム復帰初日。「握らない」意識でリハビリ。左腕に顕著な疲労の左右差（デバッグが必要）。\"},
+  {\"date\":\"2026-03-07\",\"condition\":null,\"mainWorkout\":\"完全休息\",\"weightRepSet\":\"—\",\"subWorkout\":\"—\",\"remarks\":\"休み切りフェーズ。身体の信号を優先し、リカバリーに専念。\"},
+  {\"date\":\"2026-03-11\",\"condition\":4.5,\"mainWorkout\":\"休息\",\"weightRepSet\":\"—\",\"subWorkout\":\"—\",\"remarks\":\"ニュートラル（5.0）まであと一息。翌日3/12からの本格再開に向けてOSを安定させる。\"},
+  {\"date\":\"2026-03-12\",\"condition\":4.8,\"mainWorkout\":\"BP (ベンチプレス)\",\"weightRepSet\":\"40kg / (10, 10, 9) / 3s\",\"subWorkout\":\"BB-Curl 20kg (7,7,6)\",\"remarks\":\"かなり久しぶりのトレーニング。やっとやっと、回復して来た気がする。ベンチプレスで、かなり回復。\"},
+  {\"date\":\"2026-03-13\",\"condition\":5.2,\"mainWorkout\":\"休息\",\"weightRepSet\":\"—\",\"subWorkout\":\"—\",\"remarks\":\"5の大台を突破。OS安定。\"},
+  {\"date\":\"2026-03-14\",\"condition\":5.6,\"mainWorkout\":\"Home (アブローラー)\",\"weightRepSet\":\"自重 / (10, 7, 6) / 3s\",\"subWorkout\":\"なし\",\"remarks\":\"アブローラー（膝コロ）。2セット目の粘り増。上昇気流。\"},
+  {\"date\":\"2026-03-15\",\"condition\":5.2,\"mainWorkout\":\"RDL (ルーマニアンデッドリフト)\",\"weightRepSet\":\"26.5kg / (10, 10, 8) / 3s\",\"subWorkout\":\"バックエクステンション (7/7/7)\",\"remarks\":\"メインをSQからRDLへ変更。大臀筋下部重視。\"},
+  {\"date\":\"2026-03-17\",\"condition\":null,\"mainWorkout\":\"Home (アブローラー)\",\"weightRepSet\":\"自重 / (6, 6, 6) / 3s\",\"subWorkout\":\"なし\",\"remarks\":\"アブローラー（膝コロ）。\"},
+  {\"date\":\"2026-03-18\",\"condition\":null,\"mainWorkout\":\"PU (懸垂)\",\"weightRepSet\":\"🟣バンド / (10, 7, 6) / 3s\",\"subWorkout\":\"LPD 30kg (10*3) / DL 9kg (10/15)\",\"remarks\":\"背中の感覚はまだ。二頭筋に熱感がある。\"},
+  {\"date\":\"2026-03-20\",\"condition\":5.3,\"mainWorkout\":\"休息\",\"weightRepSet\":\"—\",\"subWorkout\":\"—\",\"remarks\":\"背中にしっかり筋肉痛！嬉しい。胸の肩側の付け根や三頭筋にも心地よい張り。\"},
+  {\"date\":\"2026-03-21\",\"condition\":6.0,\"mainWorkout\":\"BP (ベンチプレス)\",\"weightRepSet\":\"45kg / (5, 5, 5) / 3s\",\"subWorkout\":\"SC 15kg (10*3) / IC 9kg (10,7,7)\",\"remarks\":\"BP 45kg初挑戦完遂。腕のボリュームも狙った構成。コンディション6.0到達！\"},
+  {\"date\":\"2026-03-22\",\"condition\":null,\"mainWorkout\":\"Home (アブローラー)\",\"weightRepSet\":\"自重 / (7, 7, 6) / 3s\",\"subWorkout\":\"なし\",\"remarks\":\"アブローラー（膝コロ）。\"},
+  {\"date\":\"2026-03-23\",\"condition\":null,\"mainWorkout\":\"Home (アブローラー)\",\"weightRepSet\":\"自重 / (7, 7, 7) / 3s\",\"subWorkout\":\"なし\",\"remarks\":\"アブローラー（膝コロ）。7回3セットで安定。\"},
+  {\"date\":\"2026-03-24\",\"condition\":null,\"mainWorkout\":\"RDL (ルーマニアンデッドリフト)\",\"weightRepSet\":\"25kg / (10, 10, 10) / 3s\",\"subWorkout\":\"バックエクステンション (10, 10, 10)\",\"remarks\":\"RDL 25kgで完遂。バックエクステンションも10回3セット。\"},
+  {\"date\":\"2026-03-25\",\"condition\":5.5,\"mainWorkout\":\"休息\",\"weightRepSet\":\"—\",\"subWorkout\":\"—\",\"remarks\":\"4日連続稼働後のOS確認。5.0以上をキープしており良好。\"},
+  {\"date\":\"2026-03-26\",\"condition\":null,\"mainWorkout\":\"PU (懸垂)\",\"weightRepSet\":\"🟣バンド / (10, 10, 10) / 3s\",\"subWorkout\":\"LPD (10*3) / BP 40kg (9,10,6) / DL 10kg (10*3)\",\"remarks\":\"懸垂10回3セット完遂。BP強化のため、サブ日に軽重量で組み込むテスト。\"},
+  {\"date\":\"2026-03-30\",\"condition\":5.6,\"mainWorkout\":\"Home (アブローラー)\",\"weightRepSet\":\"自重 / (7, 6, 6) / 3s\",\"subWorkout\":\"なし\",\"remarks\":\"アブローラー（膝コロ）。高コンディションを維持しつつ再始動。\"},
+  {\"date\":\"2026-04-02\",\"condition\":4.8,\"mainWorkout\":\"休息\",\"weightRepSet\":\"—\",\"subWorkout\":\"—\",\"remarks\":\"コンディション 4.8。少し落ち着いた数値。\"},
+  {\"date\":\"2026-04-06\",\"condition\":5.3,\"mainWorkout\":\"休息\",\"weightRepSet\":\"—\",\"subWorkout\":\"—\",\"remarks\":\"コンディション5.3まで上昇。エネルギーが戻ってきた感覚。\"},
+  {\"date\":\"2026-04-09\",\"condition\":null,\"mainWorkout\":\"PU (懸垂) / RDL\",\"weightRepSet\":\"懸垂 (8, 7, 6) / RDL 30kg (7, 7, 7)\",\"subWorkout\":\"LPD (3s) / DL 10kg (10, 10, 10)\",\"remarks\":\"RDLを30kgに増量。背面全体の出力を強化。\"},
+  {\"date\":\"2026-04-12\",\"condition\":6.1,\"mainWorkout\":\"BP (ベンチプレス)\",\"weightRepSet\":\"45kg / (7, 6, 4) / 3s\",\"subWorkout\":\"DBP 14kg (9, 8, 7) / DF 8kg (9)\",\"remarks\":\"BP 1セット目自己ベスト更新。DF 2セット目から左手首の痛みにより中断。要デバッグ。コンディション最高値。\"}
 ];
 
 function classifyType(mw) {
@@ -777,6 +759,11 @@ const PERIODS = [
   { key: "1y", label: "1Y", days: 365 },
 ];
 
+const LABEL_S = {
+  display: "block", fontSize: 10, letterSpacing: ".15em",
+  color: "var(--muted)", textTransform: "uppercase", marginBottom: 10,
+};
+
 function useIsMobile(breakpointPx = 520) {
   const [isMobile, setIsMobile] = useState(() => {
     try { return window.matchMedia(`(max-width:${breakpointPx}px)`).matches; } catch { return false; }
@@ -844,7 +831,7 @@ function ConditionChartCard({ logs, defaultPeriod = "1m", height = 140, showReco
       .filter(l => l.condition != null && new Date(l.date + "T00:00:00").getTime() >= cutoff)
       .sort((a, b) => new Date(a.date) - new Date(b.date))
       .map(l => ({ x: new Date(l.date + "T00:00:00").getTime(), y: l.condition, label: fmtDate(l.date).short }));
-  }, [logs, period]);
+  }, [logs, period, cutoff]);
 
   const withCond = chartPoints.map(p => p.y);
   const avg  = withCond.length ? (withCond.reduce((a,b)=>a+b,0)/withCond.length) : null;
@@ -969,7 +956,7 @@ function ConditionChartCard({ logs, defaultPeriod = "1m", height = 140, showReco
             fontSize: 13, fontWeight: 600, letterSpacing: ".06em",
             transition: "background .35s",
           }}>
-            {saved ? "✓  保存しました" : "記録する"}
+            {saved ? \"✓  保存しました\" : \"記録する\"}
           </button>
         </div>
       )}
@@ -982,15 +969,15 @@ function CondOrb({ value, size = 42 }) {
   const c = condColor(value);
   return (
     <div style={{
-      width: size, height: size, borderRadius: "50%",
+      width: size, height: size, borderRadius: \"50%\",
       background: `${c}18`, border: `1.5px solid ${c}50`,
-      display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+      display: \"flex\", alignItems: \"center\", justifyContent: \"center\", flexShrink: 0,
     }}>
       <span style={{
         fontSize: size * 0.26, fontWeight: 700, color: c,
-        fontVariantNumeric: "tabular-nums", letterSpacing: "-0.5px",
+        fontVariantNumeric: \"tabular-nums\", letterSpacing: \"-0.5px\",
       }}>
-        {value != null ? value.toFixed(1) : "—"}
+        {value != null ? value.toFixed(1) : \"—\"}
       </span>
     </div>
   );
@@ -1004,35 +991,35 @@ function OSBar({ value }) {
   return (
     <div>
       <div style={{
-        display: "flex", justifyContent: "space-between",
-        fontSize: 9, color: "var(--muted)", letterSpacing: "0.08em", marginBottom: 8,
+        display: \"flex\", justifyContent: \"space-between\",
+        fontSize: 9, color: \"var(--muted)\", letterSpacing: \"0.08em\", marginBottom: 8,
       }}>
         <span>0</span><span>NEUTRAL  5.0</span><span>10</span>
       </div>
-      <div style={{ height: 4, background: "var(--border)", borderRadius: 2, position: "relative" }}>
+      <div style={{ height: 4, background: \"var(--border)\", borderRadius: 2, position: \"relative\" }}>
         <div style={{
-          position: "absolute", left: 0, top: 0, bottom: 0,
+          position: \"absolute\", left: 0, top: 0, bottom: 0,
           width: `${pct}%`, borderRadius: 2,
           background: `linear-gradient(to right, var(--border) 50%, ${c} 50%)`,
-          transition: "width .7s cubic-bezier(.34,1.56,.64,1)",
+          transition: \"width .7s cubic-bezier(.34,1.56,.64,1)\",
         }} />
         <div style={{
-          position: "absolute", left: "50%", top: -5, bottom: -5,
-          width: 1.5, background: "var(--muted)", opacity: .45, transform: "translateX(-50%)",
+          position: \"absolute\", left: \"50%\", top: -5, bottom: -5,
+          width: 1.5, background: \"var(--muted)\", opacity: .45, transform: \"translateX(-50%)\",
         }} />
         <div style={{
-          position: "absolute", left: `${pct}%`, top: "50%",
-          transform: "translate(-50%,-50%)",
-          width: 13, height: 13, borderRadius: "50%",
-          background: c, border: "2.5px solid var(--bg)",
+          position: \"absolute\", left: `${pct}%`, top: \"50%\",
+          transform: \"translate(-50%,-50%)\",
+          width: 13, height: 13, borderRadius: \"50%\",
+          background: c, border: \"2.5px solid var(--bg)\",
           boxShadow: `0 0 0 1.5px ${c}60`,
-          transition: "left .7s cubic-bezier(.34,1.56,.64,1)",
+          transition: \"left .7s cubic-bezier(.34,1.56,.64,1)\",
         }} />
       </div>
-      <div style={{ marginTop: 10, textAlign: "center", fontSize: 10, color: "var(--muted)", letterSpacing: "0.07em" }}>
-        OS DELTA:{" "}
-        <span style={{ color: c, fontWeight: 700 }}>{diff >= 0 ? "+" : ""}{diff.toFixed(1)}</span>
-        <span style={{ margin: "0 8px", opacity: .4 }}>·</span>
+      <div style={{ marginTop: 10, textAlign: \"center\", fontSize: 10, color: \"var(--muted)\", letterSpacing: \"0.07em\" }}>
+        OS DELTA:{\" \"}
+        <span style={{ color: c, fontWeight: 700 }}>{diff >= 0 ? \"+\" : \"\"}{diff.toFixed(1)}</span>
+        <span style={{ margin: \"0 8px\", opacity: .4 }}>·</span>
         <span style={{ color: c }}>{condLabel(value)}</span>
       </div>
     </div>
@@ -1042,30 +1029,30 @@ function OSBar({ value }) {
 /* ═══ Session Mini Card ═════════════════════════════════ */
 function SessionMiniCard({ log, label }) {
   if (!log) return null;
-  const isRest = log.type === "rest";
+  const isRest = log.type === \"rest\";
   const d = fmtDate(log.date);
   const disp = splitExercisesDisplay(log.mainWorkout);
   return (
-    <div style={{ paddingBottom: 14, marginBottom: 14, borderBottom: "1px solid #F0EDE7" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-        <div style={{ fontSize: 9, letterSpacing: ".15em", color: "var(--muted)", textTransform: "uppercase" }}>{label}</div>
-        <div style={{ fontSize: 10, color: "var(--muted)" }}>{d.month}{d.day}日（{d.wdJA}）</div>
+    <div style={{ paddingBottom: 14, marginBottom: 14, borderBottom: \"1px solid #F0EDE7\" }}>
+      <div style={{ display: \"flex\", justifyContent: \"space-between\", alignItems: \"center\", marginBottom: 10 }}>
+        <div style={{ fontSize: 9, letterSpacing: \".15em\", color: \"var(--muted)\", textTransform: \"uppercase\" }}>{label}</div>
+        <div style={{ fontSize: 10, color: \"var(--muted)\" }}>{d.month}{d.day}日（{d.wdJA}）</div>
       </div>
       {isRest ? (
-        <div style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--muted)", fontSize: 13 }}>
+        <div style={{ display: \"flex\", alignItems: \"center\", gap: 8, color: \"var(--muted)\", fontSize: 13 }}>
           <span>🌿</span>
-          <span>休息 {log.remarks ? `— ${log.remarks.slice(0, 30)}${log.remarks.length > 30 ? "…" : ""}` : ""}</span>
+          <span>休息 {log.remarks ? `— ${log.remarks.slice(0, 30)}${log.remarks.length > 30 ? \"…\" : \"\"}` : \"\"}</span>
         </div>
       ) : (
         <div>
-          {log.mainWorkout && log.mainWorkout !== "—" && (
-            <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap", marginBottom: log.subWorkout && log.subWorkout !== "—" && log.subWorkout !== "なし" ? 6 : 0 }}>
-              <span style={{ fontSize: 15, fontWeight: 700, color: "var(--green)" }}>{disp.names || log.mainWorkout}</span>
-              <span style={{ fontSize: 12, color: "var(--muted)", fontVariantNumeric: "tabular-nums" }}>{disp.details || log.weightRepSet}</span>
+          {log.mainWorkout && log.mainWorkout !== \"—\" && (
+            <div style={{ display: \"flex\", alignItems: \"baseline\", gap: 8, flexWrap: \"wrap\", marginBottom: log.subWorkout && log.subWorkout !== \"—\" && log.subWorkout !== \"なし\" ? 6 : 0 }}>
+              <span style={{ fontSize: 15, fontWeight: 700, color: \"var(--green)\" }}>{disp.names || log.mainWorkout}</span>
+              <span style={{ fontSize: 12, color: \"var(--muted)\", fontVariantNumeric: \"tabular-nums\" }}>{disp.details || log.weightRepSet}</span>
             </div>
           )}
-          {log.subWorkout && log.subWorkout !== "—" && log.subWorkout !== "なし" && (
-            <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>Sub: {log.subWorkout}</div>
+          {log.subWorkout && log.subWorkout !== \"—\" && log.subWorkout !== \"なし\" && (
+            <div style={{ fontSize: 11, color: \"var(--muted)\", marginTop: 2 }}>Sub: {log.subWorkout}</div>
           )}
         </div>
       )}
@@ -1084,68 +1071,61 @@ function Dashboard({ logs }) {
 
   // Find today and yesterday's recorded sessions
   const sorted = [...logs].sort((a, b) => new Date(b.date) - new Date(a.date));
-  const recentSessions = sorted.filter(l => l.type === "training" || (l.type === "rest" && l.mainWorkout && l.mainWorkout !== "—")).slice(0, 2);
+  const recentSessions = sorted.filter(l => l.type === \"training\" || (l.type === \"rest\" && l.mainWorkout && l.mainWorkout !== \"—\")).slice(0, 2);
 
   return (
-    <div style={{ padding: "32px 24px 48px" }}>
-
-      {/* ── Date — compact, subdued ── */}
+    <div style={{ padding: \"32px 24px 48px\" }}>
       <div style={{ marginBottom: 20 }}>
         <DateHeader dateStr={today} />
       </div>
-
-      {/* ── Condition: main hero ── */}
       <div style={{
-        textAlign: "center", marginBottom: 28,
-        animation: "fadeUp .5s .2s both",
+        textAlign: \"center\", marginBottom: 28,
+        animation: \"fadeUp .5s .2s both\",
       }}>
-        <div style={{ fontSize: 9, letterSpacing: ".28em", color: "var(--muted)", textTransform: "uppercase", marginBottom: 10 }}>
+        <div style={{ fontSize: 9, letterSpacing: \".28em\", color: \"var(--muted)\", textTransform: \"uppercase\", marginBottom: 10 }}>
           Condition
         </div>
         <div style={{
           fontSize: 104, fontWeight: 100, color: c,
-          lineHeight: 1, letterSpacing: "-7px",
-          fontVariantNumeric: "tabular-nums",
-          animation: "countUp .6s .3s cubic-bezier(.22,1,.36,1) both",
+          lineHeight: 1, letterSpacing: \"-7px\",
+          fontVariantNumeric: \"tabular-nums\",
+          animation: \"countUp .6s .3s cubic-bezier(.22,1,.36,1) both\",
         }}>
-          {todayLog && todayLog.condition != null ? todayLog.condition.toFixed(1) : "—"}
+          {todayLog && todayLog.condition != null ? todayLog.condition.toFixed(1) : \"—\"}
         </div>
-        <div style={{ marginTop: 10, animation: "fadeUp .4s .5s both" }}>
+        <div style={{ marginTop: 10, animation: \"fadeUp .4s .5s both\" }}>
           {todayLog && todayLog.condition != null ? (
             <span style={{ fontSize: 12, color: c }}>{condLabel(todayLog.condition)}</span>
           ) : (
-            <span style={{ fontSize: 11, color: "var(--muted)" }}>本日の記録なし</span>
+            <span style={{ fontSize: 11, color: \"var(--muted)\" }}>本日の記録なし</span>
           )}
         </div>
       </div>
 
-      {/* OS Bar */}
       {todayLog && todayLog.condition != null && (
-        <div style={{ marginBottom: 28, animation: "fadeUp .4s .6s both" }}>
+        <div style={{ marginBottom: 28, animation: \"fadeUp .4s .6s both\" }}>
           <OSBar value={todayLog.condition} />
         </div>
       )}
 
-      {/* ── Condition Trend (shared module) ── */}
-      <div style={{ animation: "fadeUp .45s .7s both" }}>
-        <ConditionChartCard logs={logs} defaultPeriod="1m" height={110} />
+      <div style={{ animation: \"fadeUp .45s .7s both\" }}>
+        <ConditionChartCard logs={logs} defaultPeriod=\"1m\" height={110} />
       </div>
 
-      {/* ── Training Note (today + yesterday) ── */}
       {recentSessions.length > 0 && (
         <div style={{
-          background: "var(--surface)", border: "1px solid var(--border)",
-          borderRadius: 10, padding: "16px 20px 4px", marginTop: 16,
-          animation: "fadeUp .45s .8s both",
+          background: \"var(--surface)\", border: \"1px solid var(--border)\",
+          borderRadius: 10, padding: \"16px 20px 4px\", marginTop: 16,
+          animation: \"fadeUp .45s .8s both\",
         }}>
-          <div style={{ fontSize: 9, letterSpacing: ".28em", color: "var(--muted)", textTransform: "uppercase", marginBottom: 10 }}>
+          <div style={{ fontSize: 9, letterSpacing: \".28em\", color: \"var(--muted)\", textTransform: \"uppercase\", marginBottom: 10 }}>
             Training Note
           </div>
           {recentSessions.map((log, i) => (
             <SessionMiniCard
               key={log.id}
               log={log}
-              label={log.date === today ? "Today" : i === 0 ? "Latest" : "Previous"}
+              label={log.date === today ? \"Today\" : i === 0 ? \"Latest\" : \"Previous\"}
             />
           ))}
         </div>
@@ -1154,13 +1134,12 @@ function Dashboard({ logs }) {
   );
 }
 
-/* ═══ Condition Tab ══════════════════════════════════════ */
 function ConditionTab({ logs, onUpdateCondition }) {
   return (
-    <div className="fade-up" style={{ padding: "28px 24px 56px" }}>
+    <div className=\"fade-up\" style={{ padding: \"28px 24px 56px\" }}>
       <ConditionChartCard
         logs={logs}
-        defaultPeriod="1m"
+        defaultPeriod=\"1m\"
         height={140}
         showRecord={true}
         onUpdateCondition={onUpdateCondition}
@@ -1169,32 +1148,30 @@ function ConditionTab({ logs, onUpdateCondition }) {
   );
 }
 
-/* ═══ Training Tab (formerly Notes) ══════════════════════ */
 const FILTERS = [
-  { key: "all",      label: "全て" },
-  { key: "training", label: "トレーニング" },
-  { key: "rest",     label: "休息" },
+  { key: \"all\",      label: \"全て\" },
+  { key: \"training\", label: \"トレーニング\" },
+  { key: \"rest\",     label: \"休息\" },
 ];
 
 function parseExStr(str) {
-  const s = (str || "").trim();
-  if (!s || s === "—" || s === "なし") return [{ name: "", weight: "", reps: "" }];
-  return s.split(" / ").map(seg => {
+  const s = (str || \"\").trim();
+  if (!s || s === \"—\" || s === \"なし\") return [{ name: \"\", weight: \"\", reps: \"\" }];
+  return s.split(\" / \").map(seg => {
     const t = seg.trim();
-    // Try to parse: "NAME WEIGHT (REPS)"
-    const m = t.match(/^(.*?)(?:\s+([^\s(]+))?(?:\s+\(([^)]+)\))?\s*$/);
-    const name = (m?.[1] || "").trim();
-    const weight = (m?.[2] || "").trim();
-    const reps = (m?.[3] || "").trim();
+    const m = t.match(/^(.*?)(?:\\s+([^\\s(]+))?(?:\\s+\\(([^)]+)\\))?\\s*$/);
+    const name = (m?.[1] || \"\").trim();
+    const weight = (m?.[2] || \"\").trim();
+    const reps = (m?.[3] || \"\").trim();
     return { name, weight, reps };
-  }).filter(e => e.name || e.weight || e.reps).concat([{ name: "", weight: "", reps: "" }]).slice(0, 8);
+  }).filter(e => e.name || e.weight || e.reps).concat([{ name: \"\", weight: \"\", reps: \"\" }]).slice(0, 8);
 }
 
 function TrainingRecordScreen({ onClose, onSubmit, onDelete, logs, initialDate, editLog }) {
   const [date, setDate] = useState(initialDate || todayISO());
-  const [mainExs, setMainExs] = useState([{ name: "", weight: "", reps: "" }]);
-  const [subExs, setSubExs]   = useState([{ name: "", weight: "", reps: "" }]);
-  const [note, setNote]       = useState("");
+  const [mainExs, setMainExs] = useState([{ name: \"\", weight: \"\", reps: \"\" }]);
+  const [subExs, setSubExs]   = useState([{ name: \"\", weight: \"\", reps: \"\" }]);
+  const [note, setNote]       = useState(\"\");
   const [saved, setSaved]     = useState(false);
 
   const existingForDate = useMemo(() => {
@@ -1205,10 +1182,10 @@ function TrainingRecordScreen({ onClose, onSubmit, onDelete, logs, initialDate, 
   const canDelete = useMemo(() => {
     const ex = existingForDate;
     if (!ex) return false;
-    if (String(ex.id || "").startsWith("gap_")) return false;
-    if (ex.type !== "training") return false;
-    const hasMain = !!(ex.mainWorkout && ex.mainWorkout !== "—");
-    const hasSub = !!(ex.subWorkout && ex.subWorkout !== "—" && ex.subWorkout !== "なし");
+    if (String(ex.id || \"\").startsWith(\"gap_\")) return false;
+    if (ex.type !== \"training\") return false;
+    const hasMain = !!(ex.mainWorkout && ex.mainWorkout !== \"—\");
+    const hasSub = !!(ex.subWorkout && ex.subWorkout !== \"—\" && ex.subWorkout !== \"なし\");
     const hasNote = !!(ex.remarks && String(ex.remarks).trim().length > 0);
     if (!hasMain && !hasSub && !hasNote) return false;
     return true;
@@ -1218,9 +1195,9 @@ function TrainingRecordScreen({ onClose, onSubmit, onDelete, logs, initialDate, 
     const d = (editLog?.date || initialDate || todayISO());
     setDate(d);
     const existing = editLog || logs.find(l => l.date === d) || null;
-    setMainExs(parseExStr(existing?.mainWorkout || ""));
-    setSubExs(parseExStr(existing?.subWorkout || ""));
-    setNote(existing?.remarks || "");
+    setMainExs(parseExStr(existing?.mainWorkout || \"\"));
+    setSubExs(parseExStr(existing?.subWorkout || \"\"));
+    setNote(existing?.remarks || \"\");
     setSaved(false);
   }, [editLog, initialDate, logs]);
 
@@ -1231,25 +1208,25 @@ function TrainingRecordScreen({ onClose, onSubmit, onDelete, logs, initialDate, 
     const parts = [e.name.trim()];
     if (e.weight.trim()) parts.push(e.weight.trim());
     if (e.reps.trim()) parts.push(`(${e.reps.trim()})`);
-    return parts.join(" ");
-  }).join(" / ");
+    return parts.join(\" \");
+  }).join(\" / \");
 
   const handleSubmit = (e) => {
     e.preventDefault();
     const existing = logs.find(l => l.date === date) || null;
     const keepCond = (existing && existing.condition != null) ? existing.condition : null;
 
-    const mainStr = buildExStr(mainExs) || "—";
-    const subStr  = buildExStr(subExs)  || "—";
-    const wrs = mainExs.filter(ex=>ex.name.trim()).map(ex=>`${ex.weight} (${ex.reps})`).join(" / ");
+    const mainStr = buildExStr(mainExs) || \"—\";
+    const subStr  = buildExStr(subExs)  || \"—\";
+    const wrs = mainExs.filter(ex=>ex.name.trim()).map(ex=>`${ex.weight} (${ex.reps})`).join(\" / \");
 
     onSubmit({
-      id: (existing?.id && !String(existing.id).startsWith("gap_")) ? existing.id : Date.now().toString(),
+      id: (existing?.id && !String(existing.id).startsWith(\"gap_\")) ? existing.id : Date.now().toString(),
       date,
       condition: keepCond,
-      type: "training",
+      type: \"training\",
       mainWorkout: mainStr,
-      weightRepSet: wrs || existing?.weightRepSet || "—",
+      weightRepSet: wrs || existing?.weightRepSet || \"—\",
       subWorkout: subStr,
       remarks: note,
     });
@@ -1259,7 +1236,7 @@ function TrainingRecordScreen({ onClose, onSubmit, onDelete, logs, initialDate, 
 
   const handleDelete = () => {
     if (!canDelete) return;
-    const ok = window.confirm("このトレーニング記録を削除しますか？（元に戻せません）");
+    const ok = window.confirm(\"このトレーニング記録を削除しますか？（元に戻せません）\");
     if (!ok) return;
     try {
       onDelete?.(existingForDate.date);
@@ -1269,61 +1246,61 @@ function TrainingRecordScreen({ onClose, onSubmit, onDelete, logs, initialDate, 
   };
 
   return (
-    <div className="fade-up" style={{ padding: "18px 16px 56px" }}>
+    <div className=\"fade-up\" style={{ padding: \"18px 16px 56px\" }}>
       <div style={{
-        background: "var(--surface)",
-        border: "1px solid var(--border)",
+        background: \"var(--surface)\",
+        border: \"1px solid var(--border)\",
         borderRadius: 14,
-        padding: "18px 18px 22px",
-        boxShadow: "0 6px 26px rgba(0,0,0,.06)",
+        padding: \"18px 18px 22px\",
+        boxShadow: \"0 6px 26px rgba(0,0,0,.06)\",
       }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 14 }}>
+        <div style={{ display: \"flex\", alignItems: \"center\", justifyContent: \"space-between\", gap: 12, marginBottom: 14 }}>
           <button
-            type="button"
+            type=\"button\"
             onClick={onClose}
             style={{
-              background: "none",
-              border: "1px solid var(--border)",
-              color: "var(--muted)",
-              padding: "7px 10px",
+              background: \"none\",
+              border: \"1px solid var(--border)\",
+              color: \"var(--muted)\",
+              padding: \"7px 10px\",
               borderRadius: 10,
               fontSize: 11,
               fontWeight: 800,
-              letterSpacing: ".04em",
-              whiteSpace: "nowrap",
+              letterSpacing: \".04em\",
+              whiteSpace: \"nowrap\",
             }}
-            title="一覧に戻る"
+            title=\"一覧に戻る\"
           >
             ← 戻る
           </button>
-          <h2 style={{ flex: 1, textAlign: "center", fontSize: 14, fontWeight: 800, letterSpacing: ".02em" }}>
-            {editLog ? "トレーニングを編集" : "トレーニングを記録"}
+          <h2 style={{ flex: 1, textAlign: \"center\", fontSize: 14, fontWeight: 800, letterSpacing: \".02em\" }}>
+            {editLog ? \"トレーニングを編集\" : \"トレーニングを記録\"}
           </h2>
           {canDelete ? (
             <button
-              type="button"
+              type=\"button\"
               onClick={handleDelete}
               style={{
                 width: 70,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "flex-end",
-                background: "none",
-                border: "none",
-                color: "var(--muted)",
+                display: \"flex\",
+                alignItems: \"center\",
+                justifyContent: \"flex-end\",
+                background: \"none\",
+                border: \"none\",
+                color: \"var(--muted)\",
                 padding: 0,
               }}
-              title="削除"
-              aria-label="削除"
-              onMouseEnter={(e) => (e.currentTarget.style.color = "var(--terra)")}
-              onMouseLeave={(e) => (e.currentTarget.style.color = "var(--muted)")}
+              title=\"削除\"
+              aria-label=\"削除\"
+              onMouseEnter={(e) => (e.currentTarget.style.color = \"var(--terra)\")}
+              onMouseLeave={(e) => (e.currentTarget.style.color = \"var(--muted)\")}
             >
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M4 7h16" />
-                <path d="M9 7V5.5c0-.83.67-1.5 1.5-1.5h3C14.83 4 15.5 4.67 15.5 5.5V7" />
-                <path d="M7 7l1 14h8l1-14" />
-                <path d="M10 11v6" />
-                <path d="M14 11v6" />
+              <svg viewBox=\"0 0 24 24\" width=\"18\" height=\"18\" fill=\"none\" stroke=\"currentColor\" strokeWidth=\"1.6\" strokeLinecap=\"round\" strokeLinejoin=\"round\">
+                <path d=\"M4 7h16\" />
+                <path d=\"M9 7V5.5c0-.83.67-1.5 1.5-1.5h3C14.83 4 15.5 4.67 15.5 5.5V7\" />
+                <path d=\"M7 7l1 14h8l1-14\" />
+                <path d=\"M10 11v6\" />
+                <path d=\"M14 11v6\" />
               </svg>
             </button>
           ) : (
@@ -1332,59 +1309,55 @@ function TrainingRecordScreen({ onClose, onSubmit, onDelete, logs, initialDate, 
         </div>
 
         <form onSubmit={handleSubmit}>
-          {/* Date */}
-          <div style={{ marginBottom: 18, overflow: "hidden" }}>
+          <div style={{ marginBottom: 18, overflow: \"hidden\" }}>
             <div style={LABEL_S}>日付</div>
             <input
-              type="date"
+              type=\"date\"
               value={date}
               onChange={e => setDate(e.target.value)}
               required
-              style={{ width: "100%", boxSizing: "border-box", padding: "7px 6px", fontSize: "16px" }}
+              style={{ width: \"100%\", boxSizing: \"border-box\", padding: \"7px 6px\", fontSize: \"16px\" }}
             />
           </div>
 
-          {/* Main exercises */}
           <div style={{ marginBottom: 18 }}>
             <div style={LABEL_S}>メイン種目</div>
             {mainExs.map((ex, i) => (
-              <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 76px 100px", gap: 6, marginBottom: 6 }}>
-                <input type="text" placeholder="種目名 (例: BP)" value={ex.name} onChange={e => updMain(i,"name",e.target.value)} />
-                <input type="text" placeholder="重量" value={ex.weight} onChange={e => updMain(i,"weight",e.target.value)} />
-                <input type="text" placeholder="回数 7,6,4" value={ex.reps} onChange={e => updMain(i,"reps",e.target.value)} />
+              <div key={i} style={{ display: \"grid\", gridTemplateColumns: \"1fr 76px 100px\", gap: 6, marginBottom: 6 }}>
+                <input type=\"text\" placeholder=\"種目名 (例: BP)\" value={ex.name} onChange={e => updMain(i,\"name\",e.target.value)} />
+                <input type=\"text\" placeholder=\"重量\" value={ex.weight} onChange={e => updMain(i,\"weight\",e.target.value)} />
+                <input type=\"text\" placeholder=\"回数 7,6,4\" value={ex.reps} onChange={e => updMain(i,\"reps\",e.target.value)} />
               </div>
             ))}
-            <AddBtn onClick={() => setMainExs(a => [...a, {name:"",weight:"",reps:""}])} label="+ 種目を追加" />
+            <AddBtn onClick={() => setMainExs(a => [...a, {name:\"\",weight:\"\",reps:\"\"}])} label=\"+ 種目を追加\" />
           </div>
 
-          {/* Sub exercises */}
           <div style={{ marginBottom: 18 }}>
             <div style={LABEL_S}>サブ種目</div>
             {subExs.map((ex, i) => (
-              <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 76px 100px", gap: 6, marginBottom: 6 }}>
-                <input type="text" placeholder="種目名 (例: DBP)" value={ex.name} onChange={e => updSub(i,"name",e.target.value)} />
-                <input type="text" placeholder="重量" value={ex.weight} onChange={e => updSub(i,"weight",e.target.value)} />
-                <input type="text" placeholder="回数 9,8,7" value={ex.reps} onChange={e => updSub(i,"reps",e.target.value)} />
+              <div key={i} style={{ display: \"grid\", gridTemplateColumns: \"1fr 76px 100px\", gap: 6, marginBottom: 6 }}>
+                <input type=\"text\" placeholder=\"種目名 (例: DBP)\" value={ex.name} onChange={e => updSub(i,\"name\",e.target.value)} />
+                <input type=\"text\" placeholder=\"重量\" value={ex.weight} onChange={e => updSub(i,\"weight\",e.target.value)} />
+                <input type=\"text\" placeholder=\"回数 9,8,7\" value={ex.reps} onChange={e => updSub(i,\"reps\",e.target.value)} />
               </div>
             ))}
-            <AddBtn onClick={() => setSubExs(a => [...a, {name:"",weight:"",reps:""}])} label="+ 種目を追加" />
+            <AddBtn onClick={() => setSubExs(a => [...a, {name:\"\",weight:\"\",reps:\"\"}])} label=\"+ 種目を追加\" />
           </div>
 
-          {/* Note */}
           <div style={{ marginBottom: 20 }}>
             <div style={LABEL_S}>メモ・備考</div>
-            <textarea placeholder="気づいたこと、体の状態など..." value={note} onChange={e => setNote(e.target.value)} />
+            <textarea placeholder=\"気づいたこと、体の状態など...\" value={note} onChange={e => setNote(e.target.value)} />
           </div>
 
-          <button type="submit" style={{
-            width: "100%", padding: "14px",
-            background: saved ? "var(--green)" : "var(--terra)",
-            color: "#fff", border: "none", borderRadius: 7,
-            fontSize: 14, fontWeight: 600, letterSpacing: ".07em",
-            transition: "background .35s",
-            boxShadow: `0 3px 14px ${saved ? "rgba(45,90,39,.25)" : "rgba(196,97,58,.25)"}`,
+          <button type=\"submit\" style={{
+            width: \"100%\", padding: \"14px\",
+            background: saved ? \"var(--green)\" : \"var(--terra)\",
+            color: \"#fff\", border: \"none\", borderRadius: 7,
+            fontSize: 14, fontWeight: 600, letterSpacing: \".07em\",
+            transition: \"background .35s\",
+            boxShadow: `0 3px 14px ${saved ? \"rgba(45,90,39,.25)\" : \"rgba(196,97,58,.25)\"}`,
           }}>
-            {saved ? "✓  保存しました" : "記録する"}
+            {saved ? \"✓  保存しました\" : \"記録する\"}
           </button>
         </form>
       </div>
@@ -1393,15 +1366,14 @@ function TrainingRecordScreen({ onClose, onSubmit, onDelete, logs, initialDate, 
 }
 
 function TrainingTab({ logs, onUpsert }) {
-  const [filter, setFilter] = useState("all");
-  const [monthFilter, setMonthFilter] = useState("all");
+  const [filter, setFilter] = useState(\"all\");
+  const [monthFilter, setMonthFilter] = useState(\"all\");
   const [expanded, setExpanded] = useState(new Set());
   const [openRec, setOpenRec] = useState(false);
   const [editLog, setEditLog] = useState(null);
   const [initialDate, setInitialDate] = useState(todayISO());
-  const [selectedMonth, setSelectedMonth] = useState(() => todayISO().slice(0, 7)); // "YYYY-MM"
+  const [selectedMonth, setSelectedMonth] = useState(() => todayISO().slice(0, 7)); // \"YYYY-MM\"
 
-  // Build a complete day-by-day list from earliest log to today
   const today = todayISO();
   const logMap = {};
   logs.forEach(l => { logMap[l.date] = l; });
@@ -1410,8 +1382,8 @@ function TrainingTab({ logs, onUpsert }) {
     const dates = [];
     if (!logs.length) return dates;
     const earliest = logs.reduce((a, b) => a.date < b.date ? a : b).date;
-    let cur = new Date(earliest + "T00:00:00");
-    const end = new Date(today + "T00:00:00");
+    let cur = new Date(earliest + \"T00:00:00\");
+    const end = new Date(today + \"T00:00:00\");
     while (cur <= end) {
       const iso = `${cur.getFullYear()}-${String(cur.getMonth()+1).padStart(2,'0')}-${String(cur.getDate()).padStart(2,'0')}`;
       if (logMap[iso]) {
@@ -1419,8 +1391,8 @@ function TrainingTab({ logs, onUpsert }) {
       } else {
         dates.push({
           id: `gap_${iso}`, date: iso, condition: null,
-          type: "rest", mainWorkout: "—", weightRepSet: "—",
-          subWorkout: "—", remarks: "",
+          type: \"rest\", mainWorkout: \"—\", weightRepSet: \"—\",
+          subWorkout: \"—\", remarks: \"\",
         });
       }
       cur.setDate(cur.getDate() + 1);
@@ -1428,15 +1400,14 @@ function TrainingTab({ logs, onUpsert }) {
     return dates.reverse(); // newest first
   }, [logs, today]);
 
-  // Available months derived from allDates (newest first)
   const availableMonths = useMemo(() => {
     const seen = new Set();
     const months = [];
     allDates.forEach(l => {
-      const ym = l.date.slice(0, 7); // "YYYY-MM"
+      const ym = l.date.slice(0, 7); // \"YYYY-MM\"
       if (!seen.has(ym)) {
         seen.add(ym);
-        const [y, m] = ym.split("-");
+        const [y, m] = ym.split(\"-\");
         months.push({ key: ym, label: `${y}年${parseInt(m)}月` });
       }
     });
@@ -1446,7 +1417,6 @@ function TrainingTab({ logs, onUpsert }) {
   const minMonth = availableMonths.length ? availableMonths[availableMonths.length - 1].key : undefined;
   const maxMonth = availableMonths.length ? availableMonths[0].key : undefined;
 
-  // Keep month picker value within available range
   useEffect(() => {
     if (!minMonth || !maxMonth) return;
     setSelectedMonth(prev => {
@@ -1458,9 +1428,9 @@ function TrainingTab({ logs, onUpsert }) {
   }, [minMonth, maxMonth]);
 
   const filtered = allDates.filter(l => {
-    if (monthFilter !== "all" && !l.date.startsWith(monthFilter)) return false;
-    if (filter === "training") return l.type === "training";
-    if (filter === "rest")     return l.type === "rest";
+    if (monthFilter !== \"all\" && !l.date.startsWith(monthFilter)) return false;
+    if (filter === \"training\") return l.type === \"training\";
+    if (filter === \"rest\")     return l.type === \"rest\";
     return true;
   });
 
@@ -1482,92 +1452,90 @@ function TrainingTab({ logs, onUpsert }) {
   }
 
   return (
-    <div className="fade-up" style={{ paddingBottom: 48 }}>
-      <div style={{ padding: "24px 24px 0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h2 style={{ fontSize: 13, fontWeight: 600, letterSpacing: ".05em" }}>トレーニング</h2>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ fontSize: 11, color: "var(--muted)" }}>{filtered.length} entries</span>
+    <div className=\"fade-up\" style={{ paddingBottom: 48 }}>
+      <div style={{ padding: \"24px 24px 0\", display: \"flex\", justifyContent: \"space-between\", alignItems: \"center\" }}>
+        <h2 style={{ fontSize: 13, fontWeight: 600, letterSpacing: \".05em\" }}>トレーニング</h2>
+        <div style={{ display: \"flex\", alignItems: \"center\", gap: 10 }}>
+          <span style={{ fontSize: 11, color: \"var(--muted)\" }}>{filtered.length} entries</span>
           <button
             onClick={() => { setEditLog(null); setInitialDate(todayISO()); setOpenRec(true); }}
             style={{
-              background: "var(--terra)", color: "#fff", border: "none",
-              padding: "8px 12px", borderRadius: 9, fontSize: 11, fontWeight: 700,
-              letterSpacing: ".06em", boxShadow: "0 3px 14px rgba(196,97,58,.22)",
+              background: \"var(--terra)\", color: \"#fff\", border: \"none\",
+              padding: \"8px 12px\", borderRadius: 9, fontSize: 11, fontWeight: 700,
+              letterSpacing: \".06em\", boxShadow: \"0 3px 14px rgba(196,97,58,.22)\",
             }}
-            title="トレーニングを記録"
+            title=\"トレーニングを記録\"
           >
             記録する
           </button>
         </div>
       </div>
 
-      {/* Month filter */}
-      <div style={{ display: "flex", gap: 10, padding: "14px 24px 0", alignItems: "center" }}>
+      <div style={{ display: \"flex\", gap: 10, padding: \"14px 24px 0\", alignItems: \"center\" }}>
         <button
-          onClick={() => setMonthFilter("all")}
+          onClick={() => setMonthFilter(\"all\")}
           style={{
-            background: monthFilter === "all" ? "var(--terra)" : "none",
-            color: monthFilter === "all" ? "#fff" : "var(--muted)",
-            border: "1px solid",
-            borderColor: monthFilter === "all" ? "var(--terra)" : "var(--border)",
+            background: monthFilter === \"all\" ? \"var(--terra)\" : \"none\",
+            color: monthFilter === \"all\" ? \"#fff\" : \"var(--muted)\",
+            border: \"1px solid\",
+            borderColor: monthFilter === \"all\" ? \"var(--terra)\" : \"var(--border)\",
             borderRadius: 100,
-            padding: "4px 12px",
+            padding: \"4px 12px\",
             fontSize: 10,
             fontWeight: 700,
-            whiteSpace: "nowrap",
-            transition: "all .15s",
+            whiteSpace: \"nowrap\",
+            transition: \"all .15s\",
           }}
         >
           全期間
         </button>
 
-        <div style={{ display: "flex" }}>
+        <div style={{ display: \"flex\" }}>
           <input
-            type="month"
-            value={monthFilter === "all" ? selectedMonth : monthFilter}
+            type=\"month\"
+            value={monthFilter === \"all\" ? selectedMonth : monthFilter}
             min={minMonth}
             max={maxMonth}
             onChange={(e) => {
-              const v = e.target.value; // "YYYY-MM" or ""
+              const v = e.target.value; // \"YYYY-MM\" or \"\"
               if (!v) return;
               setSelectedMonth(v);
               setMonthFilter(v);
             }}
             style={{
               width: 150,
-              padding: "5px 12px",
+              padding: \"5px 12px\",
               borderRadius: 100,
-              border: "1px solid var(--border)",
-              background: "var(--bg)",
-              color: "var(--muted)",
+              border: \"1px solid var(--border)\",
+              background: \"var(--bg)\",
+              color: \"var(--muted)\",
               fontSize: 11,
               fontWeight: 600,
-              letterSpacing: ".02em",
-              outline: "none",
+              letterSpacing: \".02em\",
+              outline: \"none\",
             }}
-            title="年月で絞り込み"
+            title=\"年月で絞り込み\"
           />
         </div>
       </div>
 
-      {/* Type filter */}
-      <div style={{ display: "flex", gap: 6, padding: "10px 24px", overflowX: "auto" }}>
+      <div style={{ display: \"flex\", gap: 6, padding: \"10px 24px\", overflowX: \"auto\" }}>
         {FILTERS.map(f => (
           <button key={f.key} onClick={() => setFilter(f.key)} style={{
-            background: filter === f.key ? "var(--green)" : "none",
-            color: filter === f.key ? "#fff" : "var(--muted)",
-            border: "1px solid",
-            borderColor: filter === f.key ? "var(--green)" : "var(--border)",
-            borderRadius: 100, padding: "5px 14px",
-            fontSize: 11, fontWeight: 600, whiteSpace: "nowrap",
-            transition: "all .15s",
+            background: filter === f.key ? \"var(--green)\" : \"none\",
+            color: filter === f.key ? \"#fff\" : \"var(--muted)\",
+            border: \"1px solid\",
+            borderColor: filter === f.key ? \"var(--green)\" : \"var(--border)\",
+            borderRadius: 100, padding: \"5px 14px\",
+            fontSize: 11, fontWeight: 600, whiteSpace: \"nowrap\",
+            transition: \"all .15s\",
           }}>
             {f.label}
           </button>
         ))}
       </div>
 
-      <div style={{ overflowX: "auto" }}>
+      <div style={{ overflowX: \"auto\" }}>
         <table style={{ minWidth: 620 }}>
           <thead>
             <tr>
@@ -1588,7 +1556,7 @@ function TrainingTab({ logs, onUpsert }) {
               const disp = splitExercisesDisplay(log.mainWorkout);
 
               const openEdit = () => {
-                setEditLog(log.mainWorkout && log.mainWorkout !== "—" ? log : { ...log, type: "training" });
+                setEditLog(log.mainWorkout && log.mainWorkout !== \"—\" ? log : { ...log, type: \"training\" });
                 setInitialDate(log.date);
                 setOpenRec(true);
               };
@@ -1599,81 +1567,81 @@ function TrainingTab({ logs, onUpsert }) {
                   onClick={openEdit}
                   style={{
                     animation: `rowIn .3s ease ${Math.min(idx,8)*.04}s both`,
-                    cursor: "pointer",
+                    cursor: \"pointer\",
                   }}
-                  title="タップで編集"
+                  title=\"タップで編集\"
                 >
                   <td>
-                    <div style={{ fontVariantNumeric: "tabular-nums", fontWeight: 700, fontSize: 13 }}>{d.short}</div>
-                    <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 1 }}>{d.wdJA}</div>
+                    <div style={{ fontVariantNumeric: \"tabular-nums\", fontWeight: 700, fontSize: 13 }}>{d.short}</div>
+                    <div style={{ fontSize: 10, color: \"var(--muted)\", marginTop: 1 }}>{d.wdJA}</div>
                   </td>
                   <td style={{ paddingTop: 11, paddingBottom: 11 }}>
                     <CondOrb value={log.condition} size={40} />
                   </td>
                   <td>
                     <span style={{
-                      display: "inline-block",
-                      fontSize: 10, padding: "3px 8px", borderRadius: 100,
-                      background: log.type === "training" ? "var(--green-dim)" : "#F5F3EF",
-                      color: log.type === "training" ? "var(--green)" : "var(--muted)",
-                      fontWeight: 600, letterSpacing: ".05em", whiteSpace: "nowrap",
+                      display: \"inline-block\",
+                      fontSize: 10, padding: \"3px 8px\", borderRadius: 100,
+                      background: log.type === \"training\" ? \"var(--green-dim)\" : \"#F5F3EF\",
+                      color: log.type === \"training\" ? \"var(--green)\" : \"var(--muted)\",
+                      fontWeight: 600, letterSpacing: \".05em\", whiteSpace: \"nowrap\",
                     }}>
-                      {log.type === "training" ? "運動" : "休息"}
+                      {log.type === \"training\" ? \"運動\" : \"休息\"}
                     </span>
                   </td>
                   <td>
-                    {log.mainWorkout && log.mainWorkout !== "—" ? (
+                    {log.mainWorkout && log.mainWorkout !== \"—\" ? (
                       <div>
-                        <div style={{ fontWeight: 700, fontSize: 12, color: "var(--green)" }}>{disp.names || log.mainWorkout}</div>
-                        {(disp.details || (log.weightRepSet && log.weightRepSet !== "—")) && (
-                          <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2, fontVariantNumeric: "tabular-nums" }}>
+                        <div style={{ fontWeight: 700, fontSize: 12, color: \"var(--green)\" }}>{disp.names || log.mainWorkout}</div>
+                        {(disp.details || (log.weightRepSet && log.weightRepSet !== \"—\")) && (
+                          <div style={{ fontSize: 11, color: \"var(--muted)\", marginTop: 2, fontVariantNumeric: \"tabular-nums\" }}>
                             {disp.details || log.weightRepSet}
                           </div>
                         )}
                       </div>
-                    ) : <span style={{ color: "#D0CDC5" }}>—</span>}
+                    ) : <span style={{ color: \"#D0CDC5\" }}>—</span>}
                   </td>
                   <td>
-                    {log.subWorkout && log.subWorkout !== "—" && log.subWorkout !== "なし" ? (
-                      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    {log.subWorkout && log.subWorkout !== \"—\" && log.subWorkout !== \"なし\" ? (
+                      <div style={{ display: \"flex\", flexDirection: \"column\", gap: 4 }}>
                         {splitSlash(log.subWorkout).map((seg, i) => {
                           const ex = normalizeExerciseSegment(seg);
                           const line = ex
-                            ? [ex.name, ex.weight, ex.sets ? `(${ex.sets})` : ""].filter(Boolean).join(" ")
+                            ? [ex.name, ex.weight, ex.sets ? `(${ex.sets})` : \"\"].filter(Boolean).join(\" \")
                             : seg;
                           return (
-                            <div key={i} style={{ display: "flex", gap: 6, alignItems: "baseline" }}>
-                              <span style={{ color: "#C8C4BC", fontSize: 12, lineHeight: 1 }}>・</span>
-                              <span style={{ fontSize: 11, color: "#666", lineHeight: 1.55, wordBreak: "break-word" }}>
+                            <div key={i} style={{ display: \"flex\", gap: 6, alignItems: \"baseline\" }}>
+                              <span style={{ color: \"#C8C4BC\", fontSize: 12, lineHeight: 1 }}>・</span>
+                              <span style={{ fontSize: 11, color: \"#666\", lineHeight: 1.55, wordBreak: \"break-word\" }}>
                                 {line}
                               </span>
                             </div>
                           );
                         })}
                       </div>
-                    ) : <span style={{ color: "#D0CDC5", fontSize: 11 }}>—</span>}
+                    ) : <span style={{ color: \"#D0CDC5\", fontSize: 11 }}>—</span>}
                   </td>
                   <td>
                     {hasNote ? (
                       <div
                         onClick={(e) => { e.stopPropagation(); isLong && toggle(log.id); }}
-                        style={{ cursor: isLong ? "pointer" : "default" }}
-                        title={isLong ? "タップで展開/折りたたみ" : undefined}
+                        style={{ cursor: isLong ? \"pointer\" : \"default\" }}
+                        title={isLong ? \"タップで展開/折りたたみ\" : undefined}
                       >
                         <div style={{
-                          fontSize: 11, color: "#555", lineHeight: 1.65,
-                          display: isExp ? "block" : "-webkit-box",
-                          WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden",
+                          fontSize: 11, color: \"#555\", lineHeight: 1.65,
+                          display: isExp ? \"block\" : \"-webkit-box\",
+                          WebkitLineClamp: 2, WebkitBoxOrient: \"vertical\", overflow: \"hidden\",
                         }}>
                           {isExp ? log.remarks : log.remarks}
                         </div>
                         {isLong && (
-                          <div style={{ fontSize: 9, color: "var(--terra)", marginTop: 2 }}>
-                            {isExp ? "▲ 閉じる" : "▼ 展開"}
+                          <div style={{ fontSize: 9, color: \"var(--terra)\", marginTop: 2 }}>
+                            {isExp ? \"▲ 閉じる\" : \"▼ 展開\"}
                           </div>
                         )}
                       </div>
-                    ) : <span style={{ color: "#D0CDC5", fontSize: 11 }}>—</span>}
+                    ) : <span style={{ color: \"#D0CDC5\", fontSize: 11 }}>—</span>}
                   </td>
                 </tr>
               );
@@ -1685,201 +1653,29 @@ function TrainingTab({ logs, onUpsert }) {
   );
 }
 
-/* ═══ Style helpers ══════════════════════════════════════ */
-const LABEL_S = {
-  display: "block", fontSize: 10, letterSpacing: ".15em",
-  color: "var(--muted)", textTransform: "uppercase", marginBottom: 10,
-};
-
 function AddBtn({ onClick, label }) {
   return (
-    <button type="button" onClick={onClick} style={{
-      background: "none", border: "1px dashed #C8C4BC", color: "var(--muted)",
-      padding: "6px 14px", borderRadius: 6, fontSize: 11, letterSpacing: ".05em",
-      transition: "all .15s",
+    <button type=\"button\" onClick={onClick} style={{
+      background: \"none\", border: \"1px dashed #C8C4BC\", color: \"var(--muted)\",
+      padding: \"6px 14px\", borderRadius: 6, fontSize: 11, letterSpacing: \".05em\",
+      transition: \"all .15s\",
     }}
-      onMouseEnter={e => { e.currentTarget.style.borderColor="var(--green)"; e.currentTarget.style.color="var(--green)"; }}
-      onMouseLeave={e => { e.currentTarget.style.borderColor="#C8C4BC"; e.currentTarget.style.color="var(--muted)"; }}
+      onMouseEnter={e => { e.currentTarget.style.borderColor=\"var(--green)\"; e.currentTarget.style.color=\"var(--green)\"; }}
+      onMouseLeave={e => { e.currentTarget.style.borderColor=\"#C8C4BC\"; e.currentTarget.style.color=\"var(--muted)\"; }}
     >{label}</button>
   );
 }
 
-/* ═══ Record Form ════════════════════════════════════════ */
-function RecordForm({ onSubmit, logs }) {
-  const [type, setType]   = useState("training");
-  const [date, setDate]   = useState("2026-04-12");
-  const [cond, setCond]   = useState(5.0);
-
-  // Sync slider when date changes
-  useEffect(() => {
-    const found = logs.find(l => l.date === date);
-    if (found && found.condition != null) {
-      setCond(found.condition);
-    } else {
-      setCond(5.0);
-    }
-  }, [date, logs]);
-  const [mainExs, setMainExs] = useState([{ name: "", weight: "", reps: "" }]);
-  const [subExs, setSubExs]   = useState([{ name: "", weight: "", reps: "" }]);
-  const [note, setNote]   = useState("");
-  const [saved, setSaved] = useState(false);
-
-  const updMain = (i, k, v) => setMainExs(a => { const n=[...a]; n[i]={...n[i],[k]:v}; return n; });
-  const updSub  = (i, k, v) => setSubExs(a  => { const n=[...a]; n[i]={...n[i],[k]:v}; return n; });
-
-  const buildExStr = (exs) => exs.filter(e=>e.name.trim()).map(e=>{
-    const parts = [e.name.trim()];
-    if (e.weight.trim()) parts.push(e.weight.trim());
-    if (e.reps.trim()) parts.push(`(${e.reps.trim()})`);
-    return parts.join(" ");
-  }).join(" / ");
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    const mainStr = type === "training" ? (buildExStr(mainExs) || "—") : "休息";
-    const subStr  = type === "training" ? (buildExStr(subExs)  || "—") : "—";
-
-    // Build weightRepSet from main exercises
-    const wrs = type === "training"
-      ? mainExs.filter(ex=>ex.name.trim()).map(ex=>`${ex.weight} (${ex.reps})`).join(" / ")
-      : "—";
-
-    onSubmit({
-      id: Date.now().toString(),
-      date, condition: parseFloat(cond),
-      type,
-      mainWorkout: mainStr,
-      weightRepSet: wrs || "—",
-      subWorkout: subStr,
-      remarks: note,
-    });
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
-    setMainExs([{ name: "", weight: "", reps: "" }]);
-    setSubExs([{ name: "", weight: "", reps: "" }]);
-    setNote("");
-  };
-
-  const cv = parseFloat(cond);
-  const cc = condColor(cv);
-  const pct = (cv / 10) * 100;
-
-  return (
-    <div className="fade-up" style={{ padding: "28px 24px 56px" }}>
-      <h2 style={{ fontSize: 13, fontWeight: 600, letterSpacing: ".05em", marginBottom: 28 }}>新しい記録</h2>
-      <form onSubmit={handleSubmit}>
-
-        {/* Type toggle */}
-        <div style={{ marginBottom: 28 }}>
-          <div style={LABEL_S}>種別</div>
-          <div style={{ display: "flex", gap: 8 }}>
-            {[["training","トレーニング"],["rest","休息"]].map(([k,l]) => (
-              <button key={k} type="button" onClick={() => setType(k)} style={{
-                flex: 1, padding: "12px",
-                background: type === k ? (k === "training" ? "var(--green)" : "var(--terra)") : "var(--surface)",
-                color: type === k ? "#fff" : "var(--muted)",
-                border: `1px solid ${type === k ? (k === "training" ? "var(--green)" : "var(--terra)") : "var(--border)"}`,
-                borderRadius: 8, fontSize: 14, fontWeight: 600,
-                transition: "all .2s",
-              }}>
-                {k === "training" ? "💪 " : "🌿 "}{l}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Date */}
-        <div style={{ marginBottom: 24, overflow: "hidden" }}>
-          <div style={LABEL_S}>日付</div>
-          <input type="date" value={date} onChange={e => setDate(e.target.value)} required
-            style={{ width: "100%", boxSizing: "border-box", padding: "7px 6px", fontSize: "16px" }} />
-        </div>
-
-        {/* Condition — common */}
-        <div style={{ marginBottom: 28 }}>
-          <div style={{ ...LABEL_S, display: "flex", alignItems: "baseline", gap: 10 }}>
-            <span>コンディション</span>
-            <span style={{ fontSize: 26, fontWeight: 100, color: cc, letterSpacing: "-1.5px", fontVariantNumeric: "tabular-nums" }}>
-              {cv.toFixed(1)}
-            </span>
-            <span style={{ fontSize: 10, color: cc, fontWeight: 700, padding: "2px 8px", borderRadius: 100, background: `${cc}15`, border: `1px solid ${cc}30` }}>
-              {cv >= 5 ? "+" : ""}{(cv-5).toFixed(1)} OS
-            </span>
-          </div>
-          <div style={{ padding: "10px 0" }}>
-            <input type="range" min="0" max="10" step="0.1"
-              value={cond} onChange={e => setCond(e.target.value)}
-              style={{ background: `linear-gradient(to right, ${cc} ${pct}%, var(--border) ${pct}%)` }}
-            />
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: "var(--muted)", marginTop: 5 }}>
-              <span>0  LOW</span><span>◆ NEUTRAL 5.0</span><span>HIGH  10</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Training-only inputs */}
-        {type === "training" && (
-          <>
-            {/* Main exercises */}
-            <div style={{ marginBottom: 22 }}>
-              <div style={LABEL_S}>メイン種目</div>
-              {mainExs.map((ex, i) => (
-                <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 76px 100px", gap: 6, marginBottom: 6 }}>
-                  <input type="text" placeholder="種目名 (例: BP)" value={ex.name} onChange={e => updMain(i,"name",e.target.value)} />
-                  <input type="text" placeholder="重量" value={ex.weight} onChange={e => updMain(i,"weight",e.target.value)} />
-                  <input type="text" placeholder="回数 7,6,4" value={ex.reps} onChange={e => updMain(i,"reps",e.target.value)} />
-                </div>
-              ))}
-              <AddBtn onClick={() => setMainExs(a => [...a, {name:"",weight:"",reps:""}])} label="+ 種目を追加" />
-            </div>
-
-            {/* Sub exercises */}
-            <div style={{ marginBottom: 22 }}>
-              <div style={LABEL_S}>サブ種目</div>
-              {subExs.map((ex, i) => (
-                <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 76px 100px", gap: 6, marginBottom: 6 }}>
-                  <input type="text" placeholder="種目名 (例: DBP)" value={ex.name} onChange={e => updSub(i,"name",e.target.value)} />
-                  <input type="text" placeholder="重量" value={ex.weight} onChange={e => updSub(i,"weight",e.target.value)} />
-                  <input type="text" placeholder="回数 9,8,7" value={ex.reps} onChange={e => updSub(i,"reps",e.target.value)} />
-                </div>
-              ))}
-              <AddBtn onClick={() => setSubExs(a => [...a, {name:"",weight:"",reps:""}])} label="+ 種目を追加" />
-            </div>
-          </>
-        )}
-
-        {/* Note */}
-        <div style={{ marginBottom: 32 }}>
-          <div style={LABEL_S}>メモ・備考</div>
-          <textarea placeholder="気づいたこと、体の状態など..." value={note} onChange={e => setNote(e.target.value)} />
-        </div>
-
-        <button type="submit" style={{
-          width: "100%", padding: "14px",
-          background: saved ? "var(--green)" : "var(--terra)",
-          color: "#fff", border: "none", borderRadius: 7,
-          fontSize: 14, fontWeight: 600, letterSpacing: ".07em",
-          transition: "background .35s",
-          boxShadow: `0 3px 14px ${saved ? "rgba(45,90,39,.25)" : "rgba(196,97,58,.25)"}`,
-        }}>
-          {saved ? "✓  記録しました" : "記録する"}
-        </button>
-      </form>
-    </div>
-  );
-}
-
-/* ═══ App Shell ══════════════════════════════════════════ */
 const TABS = [
-  { id: "dashboard",  label: "ダッシュボード" },
-  { id: "condition",  label: "コンディション" },
-  { id: "training",   label: "トレーニング" },
+  { id: \"dashboard\",  label: \"ダッシュボード\" },
+  { id: \"condition\",  label: \"コンディション\" },
+  { id: \"training\",   label: \"トレーニング\" },
 ];
 
-function App() {
+export default function App() {
   const [authed, setAuthed] = useState(() => {
     try {
-      const exp = parseInt(localStorage.getItem(AUTH_K) || "0", 10);
+      const exp = parseInt(localStorage.getItem(AUTH_K) || \"0\", 10);
       return exp > Date.now();
     } catch { return false; }
   });
@@ -1893,16 +1689,15 @@ function App() {
   });
   const [syncErr, setSyncErr] = useState(null);
   const [syncing, setSyncing] = useState(false);
-  const lastSyncedAtRef = useRef(0);
   const remoteUpdatedAtRef = useRef(null); // ISO string from server
-  const [tab, setTab] = useState("dashboard");
+  const [tab, setTab] = useState(\"dashboard\");
   const [updateAvailable, setUpdateAvailable] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const swRef = useRef(null);
   const [backupTick, setBackupTick] = useState(0);
   const isLocalhost = useMemo(() => {
-    const h = (window.location && window.location.hostname) ? window.location.hostname : "";
-    return h === "localhost" || h === "127.0.0.1" || h === "::1";
+    const h = (window.location && window.location.hostname) ? window.location.hostname : \"\";
+    return h === \"localhost\" || h === \"127.0.0.1\" || h === \"::1\";
   }, []);
   const latestLocalBackup = useMemo(() => {
     let latestKey = null;
@@ -1941,14 +1736,12 @@ function App() {
     setTimeout(() => setAuthed(true), 350);
   };
 
-  // Manual update: Request SW to skip waiting and reload
   const handleForceUpdate = () => {
-    console.log("[App] Force update triggered");
+    console.log(\"[App] Force update triggered\");
     if (swRef.current) {
-      swRef.current.waiting?.postMessage({ type: "SKIP_WAITING" });
-      // Wait a moment for SW to activate, then reload
+      swRef.current.waiting?.postMessage({ type: \"SKIP_WAITING\" });
       setTimeout(() => {
-        window.location.reload(true); // true = bypass cache
+        window.location.reload(true);
       }, 500);
     }
   };
@@ -1957,7 +1750,6 @@ function App() {
     saveLocalLogs(logs, Date.now());
   }, [logs]);
 
-  // Initial sync: pull from server; if newer, replace local
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -1970,14 +1762,12 @@ function App() {
         const { updatedAtMs: localMs } = loadLocalLogs();
         remoteUpdatedAtRef.current = remote.updatedAt || null;
 
-        // If server is empty and local has data (first-time setup), initialize server from local.
         const { logs: localLogs } = loadLocalLogs();
         const serverEmpty = Array.isArray(remote.logs) && remote.logs.length === 0;
         const localHas = Array.isArray(localLogs) && localLogs.length > 0;
         if (serverEmpty && localHas) {
           const pushed = await pushRemoteState(localLogs, remoteUpdatedAtRef.current);
           remoteUpdatedAtRef.current = pushed.updatedAt || null;
-          lastSyncedAtRef.current = Date.now();
           setSyncErr(null);
           return;
         }
@@ -1986,9 +1776,8 @@ function App() {
           setLogs(remote.logs);
           saveLocalLogs(remote.logs, remoteMs);
         }
-        lastSyncedAtRef.current = Date.now();
       } catch (e) {
-        if (!cancelled) setSyncErr(e?.message || "sync failed");
+        if (!cancelled) setSyncErr(e?.message || \"sync failed\");
       } finally {
         if (!cancelled) setSyncing(false);
       }
@@ -1996,51 +1785,42 @@ function App() {
     return () => { cancelled = true; };
   }, []);
 
-  // Push changes (debounced)
   useEffect(() => {
     if (!authed) return;
     const t = setTimeout(async () => {
       try {
         const pushed = await pushRemoteState(logs, remoteUpdatedAtRef.current);
         remoteUpdatedAtRef.current = pushed.updatedAt || remoteUpdatedAtRef.current;
-        lastSyncedAtRef.current = Date.now();
         setSyncErr(null);
       } catch (e) {
         if (e?.code === 409 && e?.data?.conflict && e?.data?.server) {
-          // Merge and retry once
           const merged = mergeLogsByDate(logs, e.data.server.logs);
           setLogs(merged);
           remoteUpdatedAtRef.current = e.data.server.updatedAt || remoteUpdatedAtRef.current;
-          setSyncErr("conflict merged");
+          setSyncErr(\"conflict merged\");
           return;
         }
-        setSyncErr(e?.message || "sync failed");
+        setSyncErr(e?.message || \"sync failed\");
       }
     }, 800);
     return () => clearTimeout(t);
   }, [logs, authed]);
 
-  // Service Worker registration & update notification
   useEffect(() => {
-    if (!("serviceWorker" in navigator)) return;
+    if (!(\"serviceWorker\" in navigator)) return;
 
-    navigator.serviceWorker.register("/sw.js").then((reg) => {
-      console.log("[App] Service Worker registered:", reg);
+    navigator.serviceWorker.register(\"/sw.js\").then((reg) => {
       swRef.current = reg;
 
-      // Listen for updates from SW
-      navigator.serviceWorker.addEventListener("message", (event) => {
-        console.log("[App] Message from SW:", event.data);
-        if (event.data && event.data.type === "UPDATE_AVAILABLE") {
-          console.log("[App] Update available!");
+      navigator.serviceWorker.addEventListener(\"message\", (event) => {
+        if (event.data && event.data.type === \"UPDATE_AVAILABLE\") {
           setUpdateAvailable(true);
         }
       });
 
-      // Check for updates periodically (every 1 hour)
       const interval = setInterval(() => {
         if (reg.installing) return;
-        reg.update().catch((err) => console.warn("[App] Update check failed:", err));
+        reg.update().catch(() => {});
       }, 3600000);
 
       return () => clearInterval(interval);
@@ -2059,15 +1839,15 @@ function App() {
         n[idx] = {
           ...cur,
           condition: keepCond,
-          type: "rest",
-          mainWorkout: "—",
-          weightRepSet: "—",
-          subWorkout: "—",
-          remarks: "",
+          type: \"rest\",
+          mainWorkout: \"—\",
+          weightRepSet: \"—\",
+          subWorkout: \"—\",
+          remarks: \"\",
         };
         return n;
       });
-      setTab("training");
+      setTab(\"training\");
       return;
     }
     setLogs(prev => {
@@ -2075,7 +1855,7 @@ function App() {
       if (idx >= 0) { const n=[...prev]; n[idx]=log; return n; }
       return [...prev, log];
     });
-    setTab("training");
+    setTab(\"training\");
   }, []);
 
   const updateCondition = useCallback((date, value) => {
@@ -2086,14 +1866,14 @@ function App() {
       }
       return [...prev, {
         id: `cond_${date}_${Date.now()}`,
-        date, condition: value, type: "rest",
-        mainWorkout: "—", weightRepSet: "—", subWorkout: "—", remarks: "",
+        date, condition: value, type: \"rest\",
+        mainWorkout: \"—\", weightRepSet: \"—\", subWorkout: \"—\", remarks: \"\",
       }];
     });
   }, []);
 
   const normalizeLocalData = useCallback(() => {
-    const ok = window.confirm("ローカルの全データを正規化します。元データはバックアップしますが、元に戻すのは手作業になります。実行しますか？");
+    const ok = window.confirm(\"ローカルの全データを正規化します。元データはバックアップしますが、元に戻すのは手作業になります。実行しますか？\");
     if (!ok) return;
     try {
       const raw = localStorage.getItem(SK);
@@ -2107,16 +1887,15 @@ function App() {
   }, [logs]);
 
   const normalizeServerData = useCallback(async () => {
-    const ok = window.confirm("サーバー上の全データを正規化して上書きします（この操作は取り消しにくいです）。実行しますか？");
+    const ok = window.confirm(\"サーバー上の全データを正規化して上書きします（この操作は取り消しにくいです）。実行しますか？\");
     if (!ok) return;
     try {
       setSyncing(true);
       setSyncErr(null);
 
-      const remote = await fetchRemoteState(); // { logs, updatedAt }
+      const remote = await fetchRemoteState();
       const remoteLogs = Array.isArray(remote?.logs) ? remote.logs : [];
 
-      // Backup remote into localStorage (client-side backup)
       try {
         localStorage.setItem(`${SK}_remote_backup_${Date.now()}`, JSON.stringify({
           logs: remoteLogs,
@@ -2128,15 +1907,14 @@ function App() {
       const pushed = await pushRemoteState(out.logs, remoteUpdatedAtRef.current);
       remoteUpdatedAtRef.current = pushed.updatedAt || remoteUpdatedAtRef.current;
 
-      // Also update local view to match server
       setLogs(out.logs);
       setBackupTick(t => t + 1);
       window.alert(`サーバーデータを正規化して上書きしました。変更のあったログ: ${out.changed}件`);
     } catch (e) {
       if (e?.code === 409 && e?.data?.conflict) {
-        window.alert("サーバー更新が競合しました。少し待ってから再実行してください。");
+        window.alert(\"サーバー更新が競合しました。少し待ってから再実行してください。\");
       } else {
-        window.alert(`サーバー正規化に失敗しました: ${e?.message || "unknown error"}`);
+        window.alert(`サーバー正規化に失敗しました: ${e?.message || \"unknown error\"}`);
       }
     } finally {
       setSyncing(false);
@@ -2147,7 +1925,7 @@ function App() {
     try {
       const raw = localStorage.getItem(SK);
       if (!raw) {
-        window.alert("ローカルデータが見つかりませんでした。");
+        window.alert(\"ローカルデータが見つかりませんでした。\");
         return;
       }
       const ts = Date.now();
@@ -2155,7 +1933,7 @@ function App() {
       setBackupTick(t => t + 1);
       window.alert(`バックアップを保存しました: ${new Date(ts).toLocaleString()}`);
     } catch {
-      window.alert("バックアップ保存に失敗しました。");
+      window.alert(\"バックアップ保存に失敗しました。\");
     }
   }, []);
 
@@ -2173,119 +1951,108 @@ function App() {
       }
     } catch {}
     if (!latestKey) {
-      window.alert("バックアップが見つかりませんでした。");
+      window.alert(\"バックアップが見つかりませんでした。\");
       return;
     }
     const ok = window.confirm(`最新バックアップ（${new Date(latestTs).toLocaleString()}）からローカルデータを復元しますか？`);
     if (!ok) return;
     try {
       const raw = localStorage.getItem(latestKey);
-      if (!raw) throw new Error("empty");
+      if (!raw) throw new Error(\"empty\");
       localStorage.setItem(SK, raw);
       const parsed = safeJsonParse(raw);
       const nextLogs = Array.isArray(parsed) ? parsed : Array.isArray(parsed?.logs) ? parsed.logs : null;
-      if (!nextLogs) throw new Error("invalid");
+      if (!nextLogs) throw new Error(\"invalid\");
       setLogs(nextLogs);
       setBackupTick(t => t + 1);
-      window.alert("復元しました（ローカルのみ）。");
+      window.alert(\"復元しました（ローカルのみ）。\");
     } catch {
-      window.alert("復元に失敗しました。");
+      window.alert(\"復元に失敗しました。\");
     }
   }, []);
 
   return (
-    <div style={{ maxWidth: 700, margin: "0 auto", minHeight: "100vh" }}>
-
-      {/* Password overlay — stays mounted until fade-out completes */}
+    <div style={{ maxWidth: 700, margin: \"0 auto\", minHeight: \"100vh\" }}>
       {!authed && (
         <div style={{
-          position: "fixed", inset: 0, zIndex: 1000,
+          position: \"fixed\", inset: 0, zIndex: 1000,
           opacity: hiding ? 0 : 1,
-          transition: "opacity .35s ease",
-          pointerEvents: hiding ? "none" : "auto",
+          transition: \"opacity .35s ease\",
+          pointerEvents: hiding ? \"none\" : \"auto\",
         }}>
           <PasswordGate onAuth={handleAuth} />
         </div>
       )}
 
-      {/* Header */}
       <header style={{
-        padding: "20px 24px 0",
-        borderBottom: "1px solid var(--border)",
-        position: "sticky", top: 0,
-        background: "var(--bg)", zIndex: 10,
+        padding: \"20px 24px 0\",
+        borderBottom: \"1px solid var(--border)\",
+        position: \"sticky\", top: 0,
+        background: \"var(--bg)\", zIndex: 10,
       }}>
-        {/* Title row + user */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-          {/* Center: Title */}
-          <div style={{ flex: 1, textAlign: "center" }}>
-            <div style={{ fontSize: 9, letterSpacing: ".28em", color: "var(--muted)", textTransform: "uppercase", marginBottom: 3 }}>
+        <div style={{ display: \"flex\", justifyContent: \"space-between\", alignItems: \"center\", marginBottom: 16 }}>
+          <div style={{ flex: 1, textAlign: \"center\" }}>
+            <div style={{ fontSize: 9, letterSpacing: \".28em\", color: \"var(--muted)\", textTransform: \"uppercase\", marginBottom: 3 }}>
               PERSONAL HEALTH LOG
             </div>
-            <h1 style={{ fontSize: 17, fontWeight: 300, color: "var(--green)", letterSpacing: ".01em" }}>
+            <h1 style={{ fontSize: 17, fontWeight: 300, color: \"var(--green)\", letterSpacing: \".01em\" }}>
               Self Conditioning App
             </h1>
           </div>
 
-          {/* Right: User badge + Settings icon */}
-          <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
+          <div style={{ display: \"flex\", alignItems: \"center\", gap: 12, flexShrink: 0 }}>
             <div style={{
-              width: 30, height: 30, borderRadius: "50%",
-              background: "var(--green-dim)", border: "1.5px solid var(--green)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 12, fontWeight: 700, color: "var(--green)",
-              letterSpacing: "0",
+              width: 30, height: 30, borderRadius: \"50%\",
+              background: \"var(--green-dim)\", border: \"1.5px solid var(--green)\",
+              display: \"flex\", alignItems: \"center\", justifyContent: \"center\",
+              fontSize: 12, fontWeight: 700, color: \"var(--green)\",
+              letterSpacing: \"0\",
             }}>T</div>
             <div>
-              <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text)", letterSpacing: ".01em" }}>@totzyu</div>
-              <div style={{ fontSize: 9, color: "var(--muted)", letterSpacing: ".06em", marginTop: 1 }}>ACTIVE</div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: \"var(--text)\", letterSpacing: \".01em\" }}>@totzyu</div>
+              <div style={{ fontSize: 9, color: \"var(--muted)\", letterSpacing: \".06em\", marginTop: 1 }}>ACTIVE</div>
             </div>
 
-            {/* Settings Icon - Minimal SVG gear */}
             <button
               onClick={() => setShowSettings(!showSettings)}
               style={{
-                background: "none", border: "none", padding: "6px",
-                cursor: "pointer", display: "flex", alignItems: "center",
-                justifyContent: "center", color: "var(--muted)",
-                transition: "color .2s", width: 32, height: 32,
+                background: \"none\", border: \"none\", padding: \"6px\",
+                cursor: \"pointer\", display: \"flex\", alignItems: \"center\",
+                justifyContent: \"center\", color: \"var(--muted)\",
+                transition: \"color .2s\", width: 32, height: 32,
                 marginLeft: 4,
               }}
-              onMouseEnter={(e) => e.currentTarget.style.color = "var(--green)"}
-              onMouseLeave={(e) => e.currentTarget.style.color = "var(--muted)"}
-              title="設定"
+              onMouseEnter={(e) => e.currentTarget.style.color = \"var(--green)\"}
+              onMouseLeave={(e) => e.currentTarget.style.color = \"var(--muted)\"}
+              title=\"設定\"
             >
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                {/* Center circle */}
-                <circle cx="12" cy="12" r="2.5" />
-                {/* Outer gear teeth */}
-                <circle cx="12" cy="12" r="8" />
-                {/* 8 rotation lines for gear effect */}
-                <line x1="12" y1="2" x2="12" y2="4" />
-                <line x1="12" y1="20" x2="12" y2="22" />
-                <line x1="2" y1="12" x2="4" y2="12" />
-                <line x1="20" y1="12" x2="22" y2="12" />
-                <line x1="4.93" y1="4.93" x2="6.36" y2="6.36" />
-                <line x1="17.64" y1="17.64" x2="19.07" y2="19.07" />
-                <line x1="19.07" y1="4.93" x2="17.64" y2="6.36" />
-                <line x1="6.36" y1="17.64" x2="4.93" y2="19.07" />
+              <svg viewBox=\"0 0 24 24\" width=\"18\" height=\"18\" fill=\"none\" stroke=\"currentColor\" strokeWidth=\"1.5\" strokeLinecap=\"round\" strokeLinejoin=\"round\">
+                <circle cx=\"12\" cy=\"12\" r=\"2.5\" />
+                <circle cx=\"12\" cy=\"12\" r=\"8\" />
+                <line x1=\"12\" y1=\"2\" x2=\"12\" y2=\"4\" />
+                <line x1=\"12\" y1=\"20\" x2=\"12\" y2=\"22\" />
+                <line x1=\"2\" y1=\"12\" x2=\"4\" y2=\"12\" />
+                <line x1=\"20\" y1=\"12\" x2=\"22\" y2=\"12\" />
+                <line x1=\"4.93\" y1=\"4.93\" x2=\"6.36\" y2=\"6.36\" />
+                <line x1=\"17.64\" y1=\"17.64\" x2=\"19.07\" y2=\"19.07\" />
+                <line x1=\"19.07\" y1=\"4.93\" x2=\"17.64\" y2=\"6.36\" />
+                <line x1=\"6.36\" y1=\"17.64\" x2=\"4.93\" y2=\"19.07\" />
               </svg>
             </button>
           </div>
         </div>
 
-        {/* Tab nav — no scroll */}
-        <nav style={{ display: "flex", overflow: "hidden" }}>
+        <nav style={{ display: \"flex\", overflow: \"hidden\" }}>
           {TABS.map(t => (
             <button key={t.id} onClick={() => setTab(t.id)} style={{
-              background: "none", border: "none", flex: 1,
-              borderBottom: tab === t.id ? "2.5px solid var(--green)" : "2.5px solid transparent",
-              padding: "8px 4px", fontSize: 11,
-              color: tab === t.id ? "var(--green)" : "var(--muted)",
+              background: \"none\", border: \"none\", flex: 1,
+              borderBottom: tab === t.id ? \"2.5px solid var(--green)\" : \"2.5px solid transparent\",
+              padding: \"8px 4px\", fontSize: 11,
+              color: tab === t.id ? \"var(--green)\" : \"var(--muted)\",
               fontWeight: tab === t.id ? 700 : 400,
-              letterSpacing: ".01em", marginBottom: -1,
-              transition: "color .2s,border-color .2s",
-              whiteSpace: "nowrap",
+              letterSpacing: \".01em\", marginBottom: -1,
+              transition: \"color .2s,border-color .2s\",
+              whiteSpace: \"nowrap\",
             }}>
               {t.label}
             </button>
@@ -2294,51 +2061,47 @@ function App() {
       </header>
 
       <main>
-        {tab === "dashboard" && <Dashboard key="db" logs={logs} />}
-        {tab === "condition" && <ConditionTab key="cond" logs={logs} onUpdateCondition={updateCondition} />}
-        {tab === "training"  && <TrainingTab key="train" logs={logs} onUpsert={addLog} />}
+        {tab === \"dashboard\" && <Dashboard key=\"db\" logs={logs} />}
+        {tab === \"condition\" && <ConditionTab key=\"cond\" logs={logs} onUpdateCondition={updateCondition} />}
+        {tab === \"training\"  && <TrainingTab key=\"train\" logs={logs} onUpsert={addLog} />}
       </main>
 
-      {/* Settings Modal */}
       {showSettings && (
         <div style={{
-          position: "fixed", inset: 0, zIndex: 999,
-          background: "rgba(0,0,0,.4)", display: "flex",
-          alignItems: "flex-end", justifyContent: "center",
-          animation: "fadeUp .25s ease",
+          position: \"fixed\", inset: 0, zIndex: 999,
+          background: \"rgba(0,0,0,.4)\", display: \"flex\",
+          alignItems: \"flex-end\", justifyContent: \"center\",
+          animation: \"fadeUp .25s ease\",
         }}>
           <div style={{
-            background: "var(--surface)", borderRadius: "16px 16px 0 0",
-            padding: "28px 24px", maxWidth: "100%", width: "100%",
-            maxHeight: "80vh", overflowY: "auto",
-            borderTop: "1px solid var(--border)",
+            background: \"var(--surface)\", borderRadius: \"16px 16px 0 0\",
+            padding: \"28px 24px\", maxWidth: \"100%\", width: \"100%\",
+            maxHeight: \"80vh\", overflowY: \"auto\",
+            borderTop: \"1px solid var(--border)\",
           }}>
-            {/* Header */}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-              <h2 style={{ fontSize: 17, fontWeight: 600, letterSpacing: ".02em" }}>設定</h2>
+            <div style={{ display: \"flex\", justifyContent: \"space-between\", alignItems: \"center\", marginBottom: 24 }}>
+              <h2 style={{ fontSize: 17, fontWeight: 600, letterSpacing: \".02em\" }}>設定</h2>
               <button
                 onClick={() => setShowSettings(false)}
                 style={{
-                  background: "none", border: "none", fontSize: 20,
-                  cursor: "pointer", color: "var(--muted)", padding: "4px 8px",
+                  background: \"none\", border: \"none\", fontSize: 20,
+                  cursor: \"pointer\", color: \"var(--muted)\", padding: \"4px 8px\",
                 }}
               >
                 ✕
               </button>
             </div>
 
-            {/* Settings Content */}
-            <div style={{  gap: 16, display: "flex", flexDirection: "column" }}>
-              {/* Update Status */}
+            <div style={{  gap: 16, display: \"flex\", flexDirection: \"column\" }}>
               <div>
                 <div style={{
                   fontSize: 11,
-                  color: updateAvailable ? "var(--terra)" : "var(--muted)",
+                  color: updateAvailable ? \"var(--terra)\" : \"var(--muted)\",
                   fontWeight: 700,
-                  letterSpacing: ".06em",
+                  letterSpacing: \".06em\",
                   marginBottom: 10,
                 }}>
-                  {updateAvailable ? "新しいバージョンが利用可能です" : "すでに最新版です"}
+                  {updateAvailable ? \"新しいバージョンが利用可能です\" : \"すでに最新版です\"}
                 </div>
                 <button
                   onClick={() => {
@@ -2346,44 +2109,43 @@ function App() {
                     handleForceUpdate();
                   }}
                   style={{
-                    width: "100%",
-                    padding: "12px",
-                    background: updateAvailable ? "var(--terra)" : "var(--green)",
-                    color: "#fff",
-                    border: "none",
+                    width: \"100%\",
+                    padding: \"12px\",
+                    background: updateAvailable ? \"var(--terra)\" : \"var(--green)\",
+                    color: \"#fff\",
+                    border: \"none\",
                     borderRadius: 7,
                     fontSize: 13,
                     fontWeight: 600,
-                    letterSpacing: ".06em",
-                    cursor: "pointer",
-                    transition: "opacity .2s",
+                    letterSpacing: \".06em\",
+                    cursor: \"pointer\",
+                    transition: \"opacity .2s\",
                   }}
-                  onMouseEnter={(e) => e.target.style.opacity = "0.85"}
-                  onMouseLeave={(e) => e.target.style.opacity = "1"}
+                  onMouseEnter={(e) => e.target.style.opacity = \"0.85\"}
+                  onMouseLeave={(e) => e.target.style.opacity = \"1\"}
                 >
-                  {updateAvailable ? "アップデートを更新" : "最新版を確認"}
+                  {updateAvailable ? \"アップデートを更新\" : \"最新版を確認\"}
                 </button>
               </div>
 
-              {/* Data tools */}
-              <div style={{ paddingTop: 16, borderTop: "1px solid var(--border)" }}>
-                <div style={{ fontSize: 11, color: "var(--muted)", letterSpacing: ".06em", marginBottom: 10 }}>
+              <div style={{ paddingTop: 16, borderTop: \"1px solid var(--border)\" }}>
+                <div style={{ fontSize: 11, color: \"var(--muted)\", letterSpacing: \".06em\", marginBottom: 10 }}>
                   データ
                 </div>
                 <button
                   onClick={saveLocalBackupNow}
                   style={{
-                    width: "100%",
-                    padding: "12px",
+                    width: \"100%\",
+                    padding: \"12px\",
                     marginBottom: 10,
-                    background: "none",
-                    color: "var(--muted)",
-                    border: "1px solid var(--border)",
+                    background: \"none\",
+                    color: \"var(--muted)\",
+                    border: \"1px solid var(--border)\",
                     borderRadius: 7,
                     fontSize: 12,
                     fontWeight: 700,
-                    letterSpacing: ".04em",
-                    cursor: "pointer",
+                    letterSpacing: \".04em\",
+                    cursor: \"pointer\",
                   }}
                 >
                   ローカルにバックアップを保存
@@ -2391,41 +2153,41 @@ function App() {
                 <button
                   onClick={restoreLatestLocalBackup}
                   style={{
-                    width: "100%",
-                    padding: "12px",
-                    background: "none",
-                    color: "var(--muted)",
-                    border: "1px solid var(--border)",
+                    width: \"100%\",
+                    padding: \"12px\",
+                    background: \"none\",
+                    color: \"var(--muted)\",
+                    border: \"1px solid var(--border)\",
                     borderRadius: 7,
                     fontSize: 12,
                     fontWeight: 700,
-                    letterSpacing: ".04em",
-                    cursor: "pointer",
+                    letterSpacing: \".04em\",
+                    cursor: \"pointer\",
                   }}
                 >
                   最新バックアップから復元
                 </button>
-                <div style={{ marginTop: 10, fontSize: 11, color: "var(--muted)", lineHeight: 1.5, textAlign: "center" }}>
+                <div style={{ marginTop: 10, fontSize: 11, color: \"var(--muted)\", lineHeight: 1.5, textAlign: \"center\" }}>
                   最新バックアップ: {isLocalhost
-                    ? (latestLocalBackup ? new Date(latestLocalBackup.ts).toLocaleString() : "なし")
-                    : (latestRemoteBackup ? new Date(latestRemoteBackup.ts).toLocaleString() : "なし")}
+                    ? (latestLocalBackup ? new Date(latestLocalBackup.ts).toLocaleString() : \"なし\")
+                    : (latestRemoteBackup ? new Date(latestRemoteBackup.ts).toLocaleString() : \"なし\")}
                 </div>
 
                 {isLocalhost ? (
                   <button
                     onClick={normalizeLocalData}
                     style={{
-                      width: "100%",
-                      padding: "12px",
+                      width: \"100%\",
+                      padding: \"12px\",
                       marginTop: 12,
-                      background: "var(--terra-dim)",
-                      color: "var(--terra)",
-                      border: "1px solid var(--terra)",
+                      background: \"var(--terra-dim)\",
+                      color: \"var(--terra)\",
+                      border: \"1px solid var(--terra)\",
                       borderRadius: 7,
                       fontSize: 13,
                       fontWeight: 700,
-                      letterSpacing: ".04em",
-                      cursor: "pointer",
+                      letterSpacing: \".04em\",
+                      cursor: \"pointer\",
                     }}
                   >
                     ローカルデータを正規化
@@ -2435,32 +2197,31 @@ function App() {
                     onClick={normalizeServerData}
                     disabled={syncing}
                     style={{
-                      width: "100%",
-                      padding: "12px",
+                      width: \"100%\",
+                      padding: \"12px\",
                       marginTop: 12,
-                      background: syncing ? "#F3F1EB" : "var(--terra-dim)",
-                      color: syncing ? "var(--muted)" : "var(--terra)",
-                      border: "1px solid var(--terra)",
+                      background: syncing ? \"#F3F1EB\" : \"var(--terra-dim)\",
+                      color: syncing ? \"var(--muted)\" : \"var(--terra)\",
+                      border: \"1px solid var(--terra)\",
                       borderRadius: 7,
                       fontSize: 13,
                       fontWeight: 700,
-                      letterSpacing: ".04em",
-                      cursor: syncing ? "not-allowed" : "pointer",
+                      letterSpacing: \".04em\",
+                      cursor: syncing ? \"not-allowed\" : \"pointer\",
                       opacity: syncing ? 0.85 : 1,
                     }}
-                    title="サーバー上の /api/state を正規化して上書きします"
+                    title=\"サーバー上の /api/state を正規化して上書きします\"
                   >
                     サーバーデータを正規化して上書き
                   </button>
                 )}
               </div>
 
-              {/* App Info */}
-              <div style={{ padding: "16px 0", borderTop: "1px solid var(--border)" }}>
-                <div style={{ fontSize: 11, color: "var(--muted)", letterSpacing: ".06em", marginBottom: 8 }}>
+              <div style={{ padding: \"16px 0\", borderTop: \"1px solid var(--border)\" }}>
+                <div style={{ fontSize: 11, color: \"var(--muted)\", letterSpacing: \".06em\", marginBottom: 8 }}>
                   アプリバージョン
                 </div>
-                <div style={{ fontSize: 14, fontWeight: 500, fontVariantNumeric: "tabular-nums" }}>
+                <div style={{ fontSize: 14, fontWeight: 500, fontVariantNumeric: \"tabular-nums\" }}>
                   {APP_VERSION}
                 </div>
               </div>
@@ -2469,35 +2230,31 @@ function App() {
         </div>
       )}
 
-      {/* Update Notification Toast */}
       {updateAvailable && !showSettings && (
         <div style={{
-          position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)",
-          zIndex: 998, padding: "12px 16px", borderRadius: 8,
-          background: "var(--terra)", color: "#fff",
-          fontSize: 12, fontWeight: 600, letterSpacing: ".05em",
-          boxShadow: "0 4px 12px rgba(196,97,58,.3)",
-          animation: "slideUp .3s ease",
-          cursor: "pointer",
-          maxWidth: "90vw",
+          position: \"fixed\", bottom: 24, left: \"50%\", transform: \"translateX(-50%)\",
+          zIndex: 998, padding: \"12px 16px\", borderRadius: 8,
+          background: \"var(--terra)\", color: \"#fff\",
+          fontSize: 12, fontWeight: 600, letterSpacing: \".05em\",
+          boxShadow: \"0 4px 12px rgba(196,97,58,.3)\",
+          animation: \"slideUp .3s ease\",
+          cursor: \"pointer\",
+          maxWidth: \"90vw\",
         }}
         onClick={() => setShowSettings(true)}
-        title="設定を開く"
+        title=\"設定を開く\"
         >
           ✓ 新しいバージョンが利用可能 — タップして更新
         </div>
       )}
 
       <footer style={{
-        padding: "24px", textAlign: "center",
-        borderTop: "1px solid var(--border)",
-        fontSize: 9, color: "#D0CDC5", letterSpacing: ".15em",
+        padding: \"24px\", textAlign: \"center\",
+        borderTop: \"1px solid var(--border)\",
+        fontSize: 9, color: \"#D0CDC5\", letterSpacing: \".15em\",
       }}>
         SELF CONDITIONING APP  ·  {APP_VERSION}
       </footer>
     </div>
   );
 }
-
-</body>
-</html>
