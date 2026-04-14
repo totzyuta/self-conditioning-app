@@ -318,12 +318,26 @@ function todayISO() {
 }
 
 /* ═══ Smooth SVG Line Chart ══════════════════════════════ */
-function SmoothLineChart({ points, w = 640, h = 130, showNeutral = true, showDateLabels = false, color = "#2D5A27" }) {
+function SmoothLineChart({
+  points,
+  w = 640,
+  h = 130,
+  showNeutral = true,
+  showDateLabels = false,
+  color = "#2D5A27",
+  axisFontSize = 8,
+  dateFontSize = 8,
+}) {
   const [hovered, setHovered] = useState(null); // index of hovered point
   const svgRef = useRef(null);
 
   if (!points || points.length < 1) return null;
-  const pad = { t: 22, r: 20, b: 28, l: 32 };
+  const pad = {
+    t: 22,
+    r: 20,
+    b: showDateLabels ? (dateFontSize + 26) : 28,
+    l: axisFontSize >= 11 ? 40 : 32,
+  };
   const iw = w - pad.l - pad.r;
   const ih = h - pad.t - pad.b;
 
@@ -407,7 +421,7 @@ function SmoothLineChart({ points, w = 640, h = 130, showNeutral = true, showDat
   return (
     <svg
       ref={svgRef}
-      width="100%" viewBox={`0 0 ${w} ${h + (showDateLabels ? 14 : 0)}`}
+      width="100%" viewBox={`0 0 ${w} ${h}`}
       preserveAspectRatio="xMidYMid meet"
       style={{ display: "block", overflow: "visible", cursor: "crosshair" }}
       onMouseMove={handlePointer}
@@ -436,15 +450,15 @@ function SmoothLineChart({ points, w = 640, h = 130, showNeutral = true, showDat
       ))}
       {yLabels.map(v => (
         <text key={v} x={pad.l - 5} y={toY(v) + 3.5} textAnchor="end"
-          fontSize={8} fill="#9B9890">{v}</text>
+          fontSize={axisFontSize} fill="#9B9890">{v}</text>
       ))}
       {showNeutral && neutralY >= pad.t && neutralY <= pad.t+ih && (
-        <text x={pad.l + iw + 4} y={neutralY + 3} fontSize={8} fill="#9B9890">±0</text>
+        <text x={pad.l + iw + 4} y={neutralY + 3} fontSize={axisFontSize} fill="#9B9890">±0</text>
       )}
       {/* Date labels along x axis */}
       {showDateLabels && dateLabels.map((p, i) => (
-        <text key={i} x={p.px} y={pad.t + ih + 13}
-          textAnchor="middle" fontSize={8} fill="#9B9890">{p.label}</text>
+        <text key={i} x={p.px} y={pad.t + ih + (dateFontSize + 8)}
+          textAnchor="middle" fontSize={dateFontSize} fill="#9B9890">{p.label}</text>
       ))}
       {/* Hover tooltip */}
       {hp && (
@@ -495,11 +509,33 @@ const PERIODS = [
   { key: "1y", label: "1Y", days: 365 },
 ];
 
+function useIsMobile(breakpointPx = 520) {
+  const [isMobile, setIsMobile] = useState(() => {
+    try { return window.matchMedia(`(max-width:${breakpointPx}px)`).matches; } catch { return false; }
+  });
+
+  useEffect(() => {
+    let mql;
+    try { mql = window.matchMedia(`(max-width:${breakpointPx}px)`); } catch { return; }
+    const onChange = () => setIsMobile(mql.matches);
+    onChange();
+    if (mql.addEventListener) mql.addEventListener("change", onChange);
+    else mql.addListener(onChange);
+    return () => {
+      if (mql.removeEventListener) mql.removeEventListener("change", onChange);
+      else mql.removeListener(onChange);
+    };
+  }, [breakpointPx]);
+
+  return isMobile;
+}
+
 function ConditionChartCard({ logs, defaultPeriod = "1m", height = 140, showRecord = false, onUpdateCondition }) {
   const [period, setPeriod]   = useState(defaultPeriod);
   const [date, setDate]       = useState(todayISO());
   const [cond, setCond]       = useState(5.0);
   const [saved, setSaved]     = useState(false);
+  const isMobile = useIsMobile(520);
 
   useEffect(() => {
     const found = logs.find(l => l.date === date);
@@ -565,7 +601,14 @@ function ConditionChartCard({ logs, defaultPeriod = "1m", height = 140, showReco
 
       {chartPoints.length >= 2 ? (
         <>
-          <SmoothLineChart points={chartPoints} h={height} showNeutral={true} showDateLabels={true} />
+          <SmoothLineChart
+            points={chartPoints}
+            h={isMobile ? Math.round(height * 3) : height}
+            showNeutral={true}
+            showDateLabels={true}
+            axisFontSize={isMobile ? 11 : 8}
+            dateFontSize={isMobile ? 11 : 8}
+          />
           {/* Stats row */}
           <div style={{ display: "flex", borderTop: "1px solid var(--border)", marginTop: 12 }}>
             {[
