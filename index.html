@@ -101,6 +101,68 @@ const SK     = "phl_tracker_v1";
 const AUTH_K = "phl_auth_v1";
 const PW     = "totzyu0424";
 
+function safeJsonParse(s) {
+  try { return JSON.parse(s); } catch { return null; }
+}
+
+function loadLocalLogs() {
+  const raw = localStorage.getItem(SK);
+  if (!raw) return { logs: null, updatedAtMs: 0 };
+  const parsed = safeJsonParse(raw);
+  // Back-compat: older versions stored logs array directly
+  if (Array.isArray(parsed)) return { logs: parsed, updatedAtMs: 0 };
+  if (parsed && Array.isArray(parsed.logs)) {
+    const updatedAtMs = typeof parsed.updatedAtMs === "number" ? parsed.updatedAtMs : 0;
+    return { logs: parsed.logs, updatedAtMs };
+  }
+  return { logs: null, updatedAtMs: 0 };
+}
+
+function saveLocalLogs(logs, updatedAtMs = Date.now()) {
+  try { localStorage.setItem(SK, JSON.stringify({ logs, updatedAtMs })); } catch {}
+}
+
+function loadSyncPw() {
+  // This is not secure (client-side), but matches the current "password gate" model.
+  return PW;
+}
+
+async function fetchRemoteState() {
+  const res = await fetch("/api/state", {
+    headers: { "x-sync-password": loadSyncPw() },
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok || !data?.ok) throw new Error(data?.error || `HTTP ${res.status}`);
+  return data; // { logs, updatedAt }
+}
+
+async function pushRemoteState(logs, lastUpdatedAtIso) {
+  const res = await fetch("/api/state", {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      "x-sync-password": loadSyncPw(),
+      ...(lastUpdatedAtIso ? { "x-last-updated-at": lastUpdatedAtIso } : {}),
+    },
+    body: JSON.stringify({ logs }),
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok || !data?.ok) {
+    const err = new Error(data?.error || `HTTP ${res.status}`);
+    err.code = res.status;
+    err.data = data;
+    throw err;
+  }
+  return data; // { updatedAt }
+}
+
+function mergeLogsByDate(localLogs, remoteLogs) {
+  const byDate = new Map();
+  (Array.isArray(remoteLogs) ? remoteLogs : []).forEach(l => { if (l?.date) byDate.set(l.date, l); });
+  (Array.isArray(localLogs) ? localLogs : []).forEach(l => { if (l?.date) byDate.set(l.date, l); });
+  return Array.from(byDate.values()).filter(Boolean).sort((a, b) => new Date(a.date) - new Date(b.date));
+}
+
 /* ═══ Password Gate ═════════════════════════════════════ */
 function PasswordGate({ onAuth }) {
   const [val, setVal]     = useState("");
@@ -1298,9 +1360,16 @@ function App() {
   });
   const [hiding, setHiding] = useState(false);
   const [logs, setLogs] = useState(() => {
-    try { const s = localStorage.getItem(SK); if (s) return JSON.parse(s); } catch {}
+    try {
+      const { logs: local } = loadLocalLogs();
+      if (local) return local;
+    } catch {}
     return INITIAL_LOGS;
   });
+  const [syncErr, setSyncErr] = useState(null);
+  const [syncing, setSyncing] = useState(false);
+  const lastSyncedAtRef = useRef(0);
+  const remoteUpdatedAtRef = useRef(null); // ISO string from server
   const [tab, setTab] = useState("dashboard");
   const [updateAvailable, setUpdateAvailable] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -1324,8 +1393,71 @@ function App() {
   };
 
   useEffect(() => {
-    try { localStorage.setItem(SK, JSON.stringify(logs)); } catch {}
+    saveLocalLogs(logs, Date.now());
   }, [logs]);
+
+  // Initial sync: pull from server; if newer, replace local
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setSyncing(true);
+      setSyncErr(null);
+      try {
+        const remote = await fetchRemoteState();
+        if (cancelled) return;
+        const remoteMs = remote.updatedAt ? Date.parse(remote.updatedAt) : 0;
+        const { updatedAtMs: localMs } = loadLocalLogs();
+        remoteUpdatedAtRef.current = remote.updatedAt || null;
+
+        // If server is empty and local has data (first-time setup), initialize server from local.
+        const { logs: localLogs } = loadLocalLogs();
+        const serverEmpty = Array.isArray(remote.logs) && remote.logs.length === 0;
+        const localHas = Array.isArray(localLogs) && localLogs.length > 0;
+        if (serverEmpty && localHas) {
+          const pushed = await pushRemoteState(localLogs, remoteUpdatedAtRef.current);
+          remoteUpdatedAtRef.current = pushed.updatedAt || null;
+          lastSyncedAtRef.current = Date.now();
+          setSyncErr(null);
+          return;
+        }
+
+        if (remoteMs && remoteMs > (localMs || 0) && Array.isArray(remote.logs)) {
+          setLogs(remote.logs);
+          saveLocalLogs(remote.logs, remoteMs);
+        }
+        lastSyncedAtRef.current = Date.now();
+      } catch (e) {
+        if (!cancelled) setSyncErr(e?.message || "sync failed");
+      } finally {
+        if (!cancelled) setSyncing(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  // Push changes (debounced)
+  useEffect(() => {
+    if (!authed) return;
+    const t = setTimeout(async () => {
+      try {
+        const pushed = await pushRemoteState(logs, remoteUpdatedAtRef.current);
+        remoteUpdatedAtRef.current = pushed.updatedAt || remoteUpdatedAtRef.current;
+        lastSyncedAtRef.current = Date.now();
+        setSyncErr(null);
+      } catch (e) {
+        if (e?.code === 409 && e?.data?.conflict && e?.data?.server) {
+          // Merge and retry once
+          const merged = mergeLogsByDate(logs, e.data.server.logs);
+          setLogs(merged);
+          remoteUpdatedAtRef.current = e.data.server.updatedAt || remoteUpdatedAtRef.current;
+          setSyncErr("conflict merged");
+          return;
+        }
+        setSyncErr(e?.message || "sync failed");
+      }
+    }, 800);
+    return () => clearTimeout(t);
+  }, [logs, authed]);
 
   // Service Worker registration & update notification
   useEffect(() => {
