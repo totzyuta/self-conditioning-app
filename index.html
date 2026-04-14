@@ -165,6 +165,235 @@ function mergeLogsByDate(localLogs, remoteLogs) {
   return Array.from(byDate.values()).filter(Boolean).sort((a, b) => new Date(a.date) - new Date(b.date));
 }
 
+/* ═══ Local data normalization (training strings) ════════ */
+function splitSlash(s) {
+  return (s || "")
+    .split(" / ")
+    .map(x => x.trim())
+    .filter(Boolean)
+    .filter(x => x !== "—" && x !== "なし");
+}
+
+function looksLikeExerciseList(s) {
+  const t = (s || "").trim();
+  if (!t || t === "—" || t === "なし") return false;
+  if (t.includes("kg") || t.includes("(") || t.includes(")")) return true;
+  if (t.includes("/") || t.includes("🟣") || t.includes("バンド") || t.includes("自重") || t.includes("膝コロ")) return true;
+  return false;
+}
+
+function parseWeightRepSetMetrics(wrs) {
+  const segs = splitSlash(wrs);
+  if (!segs.length) return { weight: "", sets: "", note: "" };
+
+  let weight = "";
+  let sets = "";
+  const notes = [];
+
+  const isWeightTok = (tok) => {
+    if (!tok) return false;
+    if (tok.includes("kg")) return true;
+    if (/^\d+(\.\d+)?$/.test(tok)) return true;
+    if (tok === "自重" || tok === "膝コロ" || tok.includes("バンド") || tok.includes("🟣")) return true;
+    return false;
+  };
+
+  segs.forEach(s => {
+    const t = s.trim();
+    const m = t.match(/^\(([^)]+)\)$/);
+    if (!sets && m) { sets = (m[1] || "").trim(); return; }
+    if (!weight && isWeightTok(t)) { weight = t; return; }
+    notes.push(t);
+  });
+
+  return { weight, sets, note: notes.join(" / ").trim() };
+}
+
+function normalizeExerciseSegment(seg) {
+  const raw = (seg || "").trim();
+  if (!raw) return null;
+
+  let name = "";
+  let weight = "";
+  let sets = "";
+  let note = "";
+
+  // Prefer "(...)" as sets only when it looks like sets/reps info (numbers, commas, * or seconds).
+  const parenAll = Array.from(raw.matchAll(/\(([^)]+)\)/g));
+  const pickSets = (s) => {
+    const t = (s || "").trim();
+    if (!t) return false;
+    if (/[0-9]/.test(t)) return true;
+    if (t.includes(",") || t.includes("*") || t.includes("×")) return true;
+    if (/^\s*\d+(\.\d+)?s\s*$/i.test(t)) return true;
+    if (t.endsWith("s")) return true; // e.g. "3s"
+    return false;
+  };
+  let rawForParse = raw;
+  for (const m of parenAll) {
+    const inside = (m?.[1] || "").trim();
+    if (!sets && pickSets(inside)) {
+      sets = inside;
+      rawForParse = rawForParse.replace(m[0], "").trim();
+    }
+  }
+
+  const withoutParen = rawForParse.trim();
+  const parts = withoutParen.split(/\s+/).filter(Boolean);
+
+  // Heuristic: last "kg/number/selfweight/band" token is weight, everything else tends to be name+note
+  const isWeightTok = (tok) => {
+    if (!tok) return false;
+    if (tok.includes("kg")) return true;
+    if (/^\d+(\.\d+)?$/.test(tok)) return true;
+    if (tok === "自重" || tok === "膝コロ" || tok.includes("バンド") || tok.includes("🟣")) return true;
+    return false;
+  };
+
+  let weightIdx = -1;
+  for (let i = 0; i < parts.length; i++) {
+    if (isWeightTok(parts[i])) weightIdx = i;
+  }
+
+  if (weightIdx >= 0) {
+    weight = parts[weightIdx];
+    const left = parts.slice(0, weightIdx).join(" ").trim();
+    const right = parts.slice(weightIdx + 1).join(" ").trim();
+    name = left || parts[0] || "";
+    note = right;
+  } else {
+    name = parts.join(" ").trim();
+  }
+
+  // If name still contains obvious remark-like phrases, move them to note
+  const remarkWords = ["PB更新", "PR", "自己ベスト", "更新", "ディロード", "Active", "Recovery"];
+  remarkWords.forEach(w => {
+    if (name.includes(w)) {
+      name = name.replace(w, "").trim();
+      note = [w, note].filter(Boolean).join(" ");
+    }
+  });
+
+  name = name.trim();
+  if (!name) name = "（未入力）";
+
+  return { name, weight, sets, note: note.trim() };
+}
+
+function buildExerciseStr(ex) {
+  const parts = [ex.name];
+  if (ex.weight) parts.push(ex.weight);
+  if (ex.sets) parts.push(`(${ex.sets})`);
+  return parts.join(" ");
+}
+
+function splitExerciseDisplay(exStr) {
+  const ex = normalizeExerciseSegment(exStr);
+  if (!ex) return { name: "", detail: "" };
+  const detailParts = [];
+  if (ex.weight) detailParts.push(ex.weight);
+  if (ex.sets) detailParts.push(`(${ex.sets})`);
+  return { name: ex.name, detail: detailParts.join(" ") };
+}
+
+function splitExercisesDisplay(workoutStr) {
+  const segs = splitSlash(workoutStr);
+  const exs = segs.map(splitExerciseDisplay).filter(e => e.name);
+  return {
+    names: exs.map(e => e.name).join(" / "),
+    details: exs.map(e => e.detail).filter(Boolean).join(" / "),
+  };
+}
+
+function normalizeLogsLocalOnly(logs) {
+  const res = [];
+  let changed = 0;
+
+  (Array.isArray(logs) ? logs : []).forEach(l => {
+    const base = { ...l };
+    const movedNotes = [];
+
+    const mainSegs = splitSlash(base.mainWorkout);
+    const subSegs  = splitSlash(base.subWorkout);
+
+    // Main exercises
+    let mainEx = mainSegs.map(normalizeExerciseSegment).filter(Boolean);
+
+    // Special case: single exercise name + weightRepSet as metrics list (e.g. "45kg / (7,6,4) / 3s")
+    const mainLooksSingle = mainSegs.length === 1 && base.mainWorkout && base.mainWorkout !== "—";
+    const wrHasMetrics = (splitSlash(base.weightRepSet).length > 0);
+    if (mainLooksSingle && wrHasMetrics) {
+      const m = parseWeightRepSetMetrics(base.weightRepSet);
+      // Only override when weightRepSet doesn't look like an exercise list with names (avoid losing multi-exercise strings)
+      const wrSegs = splitSlash(base.weightRepSet);
+      const wrSeemsJustMetrics = wrSegs.every(s => {
+        const t = s.trim();
+        if (/^\(([^)]+)\)$/.test(t)) return true;
+        if (t.includes("kg")) return true;
+        if (/^\d+(\.\d+)?$/.test(t)) return true;
+        if (/^\d+(\.\d+)?s$/i.test(t)) return true;
+        if (t === "自重" || t === "膝コロ" || t.includes("バンド") || t.includes("🟣")) return true;
+        // If it contains kanji/kana/letters, it's probably a name/note segment
+        return false;
+      });
+      if (wrSeemsJustMetrics) {
+        const cleanedName = String(base.mainWorkout).trim() || "（未入力）";
+        mainEx = [{ name: cleanedName, weight: m.weight, sets: m.sets, note: m.note }].filter(Boolean);
+      }
+    }
+
+    // If mainWorkout is not an exercise list but weightRepSet has exercise-like segments, try to derive from weightRepSet.
+    if ((!mainEx.length || !looksLikeExerciseList(base.mainWorkout)) && looksLikeExerciseList(base.weightRepSet)) {
+      const wrSegs = splitSlash(base.weightRepSet);
+      const fromWR = wrSegs.map(normalizeExerciseSegment).filter(Boolean);
+      if (fromWR.length) mainEx = fromWR;
+    }
+
+    // Sub exercises: if it doesn't look like exercises, treat as remarks
+    let subEx = [];
+    if (looksLikeExerciseList(base.subWorkout)) {
+      subEx = subSegs.map(normalizeExerciseSegment).filter(Boolean);
+    } else if ((base.subWorkout || "").trim() && base.subWorkout !== "—" && base.subWorkout !== "なし") {
+      movedNotes.push(base.subWorkout.trim());
+    }
+
+    // Collect per-exercise notes into remarks
+    [...mainEx, ...subEx].forEach(ex => {
+      if (ex.note) movedNotes.push(`${ex.name}: ${ex.note}`);
+    });
+
+    const newMainWorkout = mainEx.length ? mainEx.map(buildExerciseStr).join(" / ") : (base.mainWorkout || "—");
+    const newSubWorkout  = subEx.length ? subEx.map(buildExerciseStr).join(" / ") : "—";
+    const newWeightRepSet = mainEx.length
+      ? mainEx
+          .map(ex => [ex.weight, ex.sets ? `(${ex.sets})` : ""].filter(Boolean).join(" ").trim())
+          .filter(Boolean)
+          .join(" / ") || "—"
+      : (base.weightRepSet || "—");
+
+    const newRemarks = [base.remarks, movedNotes.join("\n")].filter(s => (s || "").trim()).join("\n");
+
+    const next = {
+      ...base,
+      mainWorkout: newMainWorkout || "—",
+      subWorkout: newSubWorkout || "—",
+      weightRepSet: newWeightRepSet || "—",
+      remarks: newRemarks || "",
+    };
+
+    if (
+      next.mainWorkout !== base.mainWorkout ||
+      next.subWorkout !== base.subWorkout ||
+      next.weightRepSet !== base.weightRepSet ||
+      next.remarks !== base.remarks
+    ) changed++;
+
+    res.push(next);
+  });
+
+  return { logs: res, changed };
+}
+
 /* ═══ Password Gate ═════════════════════════════════════ */
 function PasswordGate({ onAuth }) {
   const [val, setVal]     = useState("");
@@ -892,6 +1121,7 @@ function SessionMiniCard({ log, label }) {
   if (!log) return null;
   const isRest = log.type === "rest";
   const d = fmtDate(log.date);
+  const disp = splitExercisesDisplay(log.mainWorkout);
   return (
     <div style={{ paddingBottom: 14, marginBottom: 14, borderBottom: "1px solid #F0EDE7" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
@@ -907,8 +1137,8 @@ function SessionMiniCard({ log, label }) {
         <div>
           {log.mainWorkout && log.mainWorkout !== "—" && (
             <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap", marginBottom: log.subWorkout && log.subWorkout !== "—" && log.subWorkout !== "なし" ? 6 : 0 }}>
-              <span style={{ fontSize: 15, fontWeight: 700, color: "var(--green)" }}>{log.mainWorkout}</span>
-              <span style={{ fontSize: 12, color: "var(--muted)", fontVariantNumeric: "tabular-nums" }}>{log.weightRepSet}</span>
+              <span style={{ fontSize: 15, fontWeight: 700, color: "var(--green)" }}>{disp.names || log.mainWorkout}</span>
+              <span style={{ fontSize: 12, color: "var(--muted)", fontVariantNumeric: "tabular-nums" }}>{disp.details || log.weightRepSet}</span>
             </div>
           )}
           {log.subWorkout && log.subWorkout !== "—" && log.subWorkout !== "なし" && (
@@ -1357,15 +1587,15 @@ function TrainingTab({ logs, onUpsert }) {
       </div>
 
       <div style={{ overflowX: "auto" }}>
-        <table style={{ minWidth: 580 }}>
+        <table style={{ minWidth: 620 }}>
           <thead>
             <tr>
               <th style={{ width: 64 }}>日付</th>
               <th style={{ width: 52 }}>状態</th>
               <th style={{ width: 70 }}>種別</th>
-              <th>メイン種目</th>
-              <th style={{ width: 100 }}>サブ種目</th>
-              <th style={{ width: 140 }}>備考</th>
+              <th style={{ minWidth: 130 }}>メイン種目</th>
+              <th style={{ width: 180 }}>サブ種目</th>
+              <th style={{ width: 120 }}>備考</th>
             </tr>
           </thead>
           <tbody>
@@ -1374,6 +1604,7 @@ function TrainingTab({ logs, onUpsert }) {
               const isExp = expanded.has(log.id);
               const hasNote = log.remarks && log.remarks.length > 0;
               const isLong = log.remarks && log.remarks.length > 28;
+              const disp = splitExercisesDisplay(log.mainWorkout);
 
               const openEdit = () => {
                 setEditLog(log.mainWorkout && log.mainWorkout !== "—" ? log : { ...log, type: "training" });
@@ -1412,16 +1643,33 @@ function TrainingTab({ logs, onUpsert }) {
                   <td>
                     {log.mainWorkout && log.mainWorkout !== "—" ? (
                       <div>
-                        <div style={{ fontWeight: 700, fontSize: 12, color: "var(--green)" }}>{log.mainWorkout}</div>
-                        {log.weightRepSet && log.weightRepSet !== "—" && (
-                          <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2, fontVariantNumeric: "tabular-nums" }}>{log.weightRepSet}</div>
+                        <div style={{ fontWeight: 700, fontSize: 12, color: "var(--green)" }}>{disp.names || log.mainWorkout}</div>
+                        {(disp.details || (log.weightRepSet && log.weightRepSet !== "—")) && (
+                          <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2, fontVariantNumeric: "tabular-nums" }}>
+                            {disp.details || log.weightRepSet}
+                          </div>
                         )}
                       </div>
                     ) : <span style={{ color: "#D0CDC5" }}>—</span>}
                   </td>
                   <td>
                     {log.subWorkout && log.subWorkout !== "—" && log.subWorkout !== "なし" ? (
-                      <span style={{ fontSize: 11, color: "#666" }}>{log.subWorkout}</span>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                        {splitSlash(log.subWorkout).map((seg, i) => {
+                          const ex = normalizeExerciseSegment(seg);
+                          const line = ex
+                            ? [ex.name, ex.weight, ex.sets ? `(${ex.sets})` : ""].filter(Boolean).join(" ")
+                            : seg;
+                          return (
+                            <div key={i} style={{ display: "flex", gap: 6, alignItems: "baseline" }}>
+                              <span style={{ color: "#C8C4BC", fontSize: 12, lineHeight: 1 }}>・</span>
+                              <span style={{ fontSize: 11, color: "#666", lineHeight: 1.55, wordBreak: "break-word" }}>
+                                {line}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
                     ) : <span style={{ color: "#D0CDC5", fontSize: 11 }}>—</span>}
                   </td>
                   <td>
@@ -1670,6 +1918,41 @@ function App() {
   const [updateAvailable, setUpdateAvailable] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const swRef = useRef(null);
+  const isLocalhost = useMemo(() => {
+    const h = (window.location && window.location.hostname) ? window.location.hostname : "";
+    return h === "localhost" || h === "127.0.0.1" || h === "::1";
+  }, []);
+  const latestLocalBackup = useMemo(() => {
+    let latestKey = null;
+    let latestTs = -1;
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (!k) continue;
+        if (!k.startsWith(`${SK}_backup_`)) continue;
+        const ts = parseInt(k.slice((`${SK}_backup_`).length), 10);
+        if (!Number.isFinite(ts)) continue;
+        if (ts > latestTs) { latestTs = ts; latestKey = k; }
+      }
+    } catch {}
+    return latestKey ? { key: latestKey, ts: latestTs } : null;
+  }, [logs.length]);
+
+  const latestRemoteBackup = useMemo(() => {
+    let latestKey = null;
+    let latestTs = -1;
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (!k) continue;
+        if (!k.startsWith(`${SK}_remote_backup_`)) continue;
+        const ts = parseInt(k.slice((`${SK}_remote_backup_`).length), 10);
+        if (!Number.isFinite(ts)) continue;
+        if (ts > latestTs) { latestTs = ts; latestKey = k; }
+      }
+    } catch {}
+    return latestKey ? { key: latestKey, ts: latestTs } : null;
+  }, [logs.length]);
 
   const handleAuth = () => {
     setHiding(true);
@@ -1803,6 +2086,88 @@ function App() {
         mainWorkout: "—", weightRepSet: "—", subWorkout: "—", remarks: "",
       }];
     });
+  }, []);
+
+  const normalizeLocalData = useCallback(() => {
+    const ok = window.confirm("ローカルの全データを正規化します。元データはバックアップしますが、元に戻すのは手作業になります。実行しますか？");
+    if (!ok) return;
+    try {
+      const raw = localStorage.getItem(SK);
+      if (raw) localStorage.setItem(`${SK}_backup_${Date.now()}`, raw);
+    } catch {}
+
+    const out = normalizeLogsLocalOnly(logs);
+    setLogs(out.logs);
+    window.alert(`正規化しました（ローカルのみ）。変更のあったログ: ${out.changed}件`);
+  }, [logs]);
+
+  const normalizeServerData = useCallback(async () => {
+    const ok = window.confirm("サーバー上の全データを正規化して上書きします（この操作は取り消しにくいです）。実行しますか？");
+    if (!ok) return;
+    try {
+      setSyncing(true);
+      setSyncErr(null);
+
+      const remote = await fetchRemoteState(); // { logs, updatedAt }
+      const remoteLogs = Array.isArray(remote?.logs) ? remote.logs : [];
+
+      // Backup remote into localStorage (client-side backup)
+      try {
+        localStorage.setItem(`${SK}_remote_backup_${Date.now()}`, JSON.stringify({
+          logs: remoteLogs,
+          updatedAt: remote.updatedAt || null,
+        }));
+      } catch {}
+
+      const out = normalizeLogsLocalOnly(remoteLogs);
+      const pushed = await pushRemoteState(out.logs, remoteUpdatedAtRef.current);
+      remoteUpdatedAtRef.current = pushed.updatedAt || remoteUpdatedAtRef.current;
+
+      // Also update local view to match server
+      setLogs(out.logs);
+      window.alert(`サーバーデータを正規化して上書きしました。変更のあったログ: ${out.changed}件`);
+    } catch (e) {
+      if (e?.code === 409 && e?.data?.conflict) {
+        window.alert("サーバー更新が競合しました。少し待ってから再実行してください。");
+      } else {
+        window.alert(`サーバー正規化に失敗しました: ${e?.message || "unknown error"}`);
+      }
+    } finally {
+      setSyncing(false);
+    }
+  }, []);
+
+  const restoreLatestLocalBackup = useCallback(() => {
+    let latestKey = null;
+    let latestTs = -1;
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (!k) continue;
+        if (!k.startsWith(`${SK}_backup_`)) continue;
+        const ts = parseInt(k.slice((`${SK}_backup_`).length), 10);
+        if (!Number.isFinite(ts)) continue;
+        if (ts > latestTs) { latestTs = ts; latestKey = k; }
+      }
+    } catch {}
+    if (!latestKey) {
+      window.alert("バックアップが見つかりませんでした。");
+      return;
+    }
+    const ok = window.confirm(`最新バックアップ（${new Date(latestTs).toLocaleString()}）からローカルデータを復元しますか？`);
+    if (!ok) return;
+    try {
+      const raw = localStorage.getItem(latestKey);
+      if (!raw) throw new Error("empty");
+      localStorage.setItem(SK, raw);
+      const parsed = safeJsonParse(raw);
+      const nextLogs = Array.isArray(parsed) ? parsed : Array.isArray(parsed?.logs) ? parsed.logs : null;
+      if (!nextLogs) throw new Error("invalid");
+      setLogs(nextLogs);
+      window.alert("復元しました（ローカルのみ）。");
+    } catch {
+      window.alert("復元に失敗しました。");
+    }
   }, []);
 
   return (
@@ -1973,6 +2338,80 @@ function App() {
                 >
                   {updateAvailable ? "アップデートを更新" : "最新版を確認"}
                 </button>
+              </div>
+
+              {/* Data tools */}
+              <div style={{ paddingTop: 16, borderTop: "1px solid var(--border)" }}>
+                <div style={{ fontSize: 11, color: "var(--muted)", letterSpacing: ".06em", marginBottom: 10 }}>
+                  データ
+                </div>
+                {isLocalhost ? (
+                  <>
+                    <button
+                      onClick={normalizeLocalData}
+                      style={{
+                        width: "100%",
+                        padding: "12px",
+                        background: "var(--terra-dim)",
+                        color: "var(--terra)",
+                        border: "1px solid var(--terra)",
+                        borderRadius: 7,
+                        fontSize: 13,
+                        fontWeight: 700,
+                        letterSpacing: ".04em",
+                        cursor: "pointer",
+                      }}
+                    >
+                      ローカルデータを正規化
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      onClick={normalizeServerData}
+                      disabled={syncing}
+                      style={{
+                        width: "100%",
+                        padding: "12px",
+                        background: syncing ? "#F3F1EB" : "var(--terra-dim)",
+                        color: syncing ? "var(--muted)" : "var(--terra)",
+                        border: "1px solid var(--terra)",
+                        borderRadius: 7,
+                        fontSize: 13,
+                        fontWeight: 700,
+                        letterSpacing: ".04em",
+                        cursor: syncing ? "not-allowed" : "pointer",
+                        opacity: syncing ? 0.85 : 1,
+                      }}
+                      title="サーバー上の /api/state を正規化して上書きします"
+                    >
+                      サーバーデータを正規化して上書き
+                    </button>
+                  </>
+                )}
+                <button
+                  onClick={restoreLatestLocalBackup}
+                  style={{
+                    width: "100%",
+                    padding: "12px",
+                    marginTop: 10,
+                    background: "none",
+                    color: "var(--muted)",
+                    border: "1px solid var(--border)",
+                    borderRadius: 7,
+                    fontSize: 12,
+                    fontWeight: 700,
+                    letterSpacing: ".04em",
+                    cursor: "pointer",
+                  }}
+                >
+                  最新バックアップから復元
+                </button>
+                <div style={{ marginTop: 10, fontSize: 11, color: "var(--muted)", lineHeight: 1.5, textAlign: "center" }}>
+                  最新バックアップ: {isLocalhost
+                    ? (latestLocalBackup ? new Date(latestLocalBackup.ts).toLocaleString() : "なし")
+                    : (latestRemoteBackup ? new Date(latestRemoteBackup.ts).toLocaleString() : "なし")}
+                </div>
               </div>
 
               {/* App Info */}
