@@ -1918,6 +1918,7 @@ function App() {
   const [updateAvailable, setUpdateAvailable] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const swRef = useRef(null);
+  const [backupTick, setBackupTick] = useState(0);
   const isLocalhost = useMemo(() => {
     const h = (window.location && window.location.hostname) ? window.location.hostname : "";
     return h === "localhost" || h === "127.0.0.1" || h === "::1";
@@ -1936,7 +1937,7 @@ function App() {
       }
     } catch {}
     return latestKey ? { key: latestKey, ts: latestTs } : null;
-  }, [logs.length]);
+  }, [logs.length, backupTick]);
 
   const latestRemoteBackup = useMemo(() => {
     let latestKey = null;
@@ -1952,7 +1953,7 @@ function App() {
       }
     } catch {}
     return latestKey ? { key: latestKey, ts: latestTs } : null;
-  }, [logs.length]);
+  }, [logs.length, backupTick]);
 
   const handleAuth = () => {
     setHiding(true);
@@ -2098,6 +2099,7 @@ function App() {
 
     const out = normalizeLogsLocalOnly(logs);
     setLogs(out.logs);
+    setBackupTick(t => t + 1);
     window.alert(`正規化しました（ローカルのみ）。変更のあったログ: ${out.changed}件`);
   }, [logs]);
 
@@ -2125,6 +2127,7 @@ function App() {
 
       // Also update local view to match server
       setLogs(out.logs);
+      setBackupTick(t => t + 1);
       window.alert(`サーバーデータを正規化して上書きしました。変更のあったログ: ${out.changed}件`);
     } catch (e) {
       if (e?.code === 409 && e?.data?.conflict) {
@@ -2134,6 +2137,22 @@ function App() {
       }
     } finally {
       setSyncing(false);
+    }
+  }, []);
+
+  const saveLocalBackupNow = useCallback(() => {
+    try {
+      const raw = localStorage.getItem(SK);
+      if (!raw) {
+        window.alert("ローカルデータが見つかりませんでした。");
+        return;
+      }
+      const ts = Date.now();
+      localStorage.setItem(`${SK}_backup_${ts}`, raw);
+      setBackupTick(t => t + 1);
+      window.alert(`バックアップを保存しました: ${new Date(ts).toLocaleString()}`);
+    } catch {
+      window.alert("バックアップ保存に失敗しました。");
     }
   }, []);
 
@@ -2164,6 +2183,7 @@ function App() {
       const nextLogs = Array.isArray(parsed) ? parsed : Array.isArray(parsed?.logs) ? parsed.logs : null;
       if (!nextLogs) throw new Error("invalid");
       setLogs(nextLogs);
+      setBackupTick(t => t + 1);
       window.alert("復元しました（ローカルのみ）。");
     } catch {
       window.alert("復元に失敗しました。");
@@ -2307,17 +2327,15 @@ function App() {
             {/* Settings Content */}
             <div style={{  gap: 16, display: "flex", flexDirection: "column" }}>
               {/* Update Status */}
-              <div style={{
-                padding: "16px", borderRadius: 10,
-                background: updateAvailable ? "var(--terra-dim)" : "#EAF2E9",
-                border: `1px solid ${updateAvailable ? "var(--terra)" : "var(--green)"}`,
-              }}>
+              <div>
                 <div style={{
-                  fontSize: 13, fontWeight: 600,
-                  color: updateAvailable ? "var(--terra)" : "var(--green)",
-                  marginBottom: 10
+                  fontSize: 11,
+                  color: updateAvailable ? "var(--terra)" : "var(--muted)",
+                  fontWeight: 700,
+                  letterSpacing: ".06em",
+                  marginBottom: 10,
                 }}>
-                  {updateAvailable ? "📦 新しいバージョンが利用可能です" : "✓ すでに最新版です"}
+                  {updateAvailable ? "新しいバージョンが利用可能です" : "すでに最新版です"}
                 </div>
                 <button
                   onClick={() => {
@@ -2325,11 +2343,15 @@ function App() {
                     handleForceUpdate();
                   }}
                   style={{
-                    width: "100%", padding: "12px",
+                    width: "100%",
+                    padding: "12px",
                     background: updateAvailable ? "var(--terra)" : "var(--green)",
                     color: "#fff",
-                    border: "none", borderRadius: 7,
-                    fontSize: 13, fontWeight: 600, letterSpacing: ".06em",
+                    border: "none",
+                    borderRadius: 7,
+                    fontSize: 13,
+                    fontWeight: 600,
+                    letterSpacing: ".06em",
                     cursor: "pointer",
                     transition: "opacity .2s",
                   }}
@@ -2345,56 +2367,29 @@ function App() {
                 <div style={{ fontSize: 11, color: "var(--muted)", letterSpacing: ".06em", marginBottom: 10 }}>
                   データ
                 </div>
-                {isLocalhost ? (
-                  <>
-                    <button
-                      onClick={normalizeLocalData}
-                      style={{
-                        width: "100%",
-                        padding: "12px",
-                        background: "var(--terra-dim)",
-                        color: "var(--terra)",
-                        border: "1px solid var(--terra)",
-                        borderRadius: 7,
-                        fontSize: 13,
-                        fontWeight: 700,
-                        letterSpacing: ".04em",
-                        cursor: "pointer",
-                      }}
-                    >
-                      ローカルデータを正規化
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <button
-                      onClick={normalizeServerData}
-                      disabled={syncing}
-                      style={{
-                        width: "100%",
-                        padding: "12px",
-                        background: syncing ? "#F3F1EB" : "var(--terra-dim)",
-                        color: syncing ? "var(--muted)" : "var(--terra)",
-                        border: "1px solid var(--terra)",
-                        borderRadius: 7,
-                        fontSize: 13,
-                        fontWeight: 700,
-                        letterSpacing: ".04em",
-                        cursor: syncing ? "not-allowed" : "pointer",
-                        opacity: syncing ? 0.85 : 1,
-                      }}
-                      title="サーバー上の /api/state を正規化して上書きします"
-                    >
-                      サーバーデータを正規化して上書き
-                    </button>
-                  </>
-                )}
+                <button
+                  onClick={saveLocalBackupNow}
+                  style={{
+                    width: "100%",
+                    padding: "12px",
+                    marginBottom: 10,
+                    background: "none",
+                    color: "var(--muted)",
+                    border: "1px solid var(--border)",
+                    borderRadius: 7,
+                    fontSize: 12,
+                    fontWeight: 700,
+                    letterSpacing: ".04em",
+                    cursor: "pointer",
+                  }}
+                >
+                  ローカルにバックアップを保存
+                </button>
                 <button
                   onClick={restoreLatestLocalBackup}
                   style={{
                     width: "100%",
                     padding: "12px",
-                    marginTop: 10,
                     background: "none",
                     color: "var(--muted)",
                     border: "1px solid var(--border)",
@@ -2412,6 +2407,49 @@ function App() {
                     ? (latestLocalBackup ? new Date(latestLocalBackup.ts).toLocaleString() : "なし")
                     : (latestRemoteBackup ? new Date(latestRemoteBackup.ts).toLocaleString() : "なし")}
                 </div>
+
+                {isLocalhost ? (
+                  <button
+                    onClick={normalizeLocalData}
+                    style={{
+                      width: "100%",
+                      padding: "12px",
+                      marginTop: 12,
+                      background: "var(--terra-dim)",
+                      color: "var(--terra)",
+                      border: "1px solid var(--terra)",
+                      borderRadius: 7,
+                      fontSize: 13,
+                      fontWeight: 700,
+                      letterSpacing: ".04em",
+                      cursor: "pointer",
+                    }}
+                  >
+                    ローカルデータを正規化
+                  </button>
+                ) : (
+                  <button
+                    onClick={normalizeServerData}
+                    disabled={syncing}
+                    style={{
+                      width: "100%",
+                      padding: "12px",
+                      marginTop: 12,
+                      background: syncing ? "#F3F1EB" : "var(--terra-dim)",
+                      color: syncing ? "var(--muted)" : "var(--terra)",
+                      border: "1px solid var(--terra)",
+                      borderRadius: 7,
+                      fontSize: 13,
+                      fontWeight: 700,
+                      letterSpacing: ".04em",
+                      cursor: syncing ? "not-allowed" : "pointer",
+                      opacity: syncing ? 0.85 : 1,
+                    }}
+                    title="サーバー上の /api/state を正規化して上書きします"
+                  >
+                    サーバーデータを正規化して上書き
+                  </button>
+                )}
               </div>
 
               {/* App Info */}
