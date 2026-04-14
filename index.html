@@ -94,7 +94,7 @@
 const { useState, useEffect, useCallback, useMemo, useRef } = React;
 
 /* ═══ App Version ═══════════════════════════════════════  */
-const APP_VERSION = "v1.0.2";
+const APP_VERSION = "v1.0.3";
 
 /* ═══ Storage ═══════════════════════════════════════════ */
 const SK     = "phl_tracker_v1";
@@ -782,13 +782,21 @@ function Dashboard({ logs }) {
         </div>
       )}
 
-      {/* ── Recent Sessions (today + yesterday) ── */}
+      {/* ── Condition Trend (shared module) ── */}
+      <div style={{ animation: "fadeUp .45s .7s both" }}>
+        <ConditionChartCard logs={logs} defaultPeriod="1m" height={110} />
+      </div>
+
+      {/* ── Training Note (today + yesterday) ── */}
       {recentSessions.length > 0 && (
         <div style={{
           background: "var(--surface)", border: "1px solid var(--border)",
-          borderRadius: 10, padding: "18px 20px 4px", marginBottom: 16,
-          animation: "fadeUp .45s .7s both",
+          borderRadius: 10, padding: "16px 20px 4px", marginTop: 16,
+          animation: "fadeUp .45s .8s both",
         }}>
+          <div style={{ fontSize: 9, letterSpacing: ".28em", color: "var(--muted)", textTransform: "uppercase", marginBottom: 10 }}>
+            Training Note
+          </div>
           {recentSessions.map((log, i) => (
             <SessionMiniCard
               key={log.id}
@@ -798,11 +806,6 @@ function Dashboard({ logs }) {
           ))}
         </div>
       )}
-
-      {/* ── Condition Trend (shared module) ── */}
-      <div style={{ animation: "fadeUp .45s .8s both" }}>
-        <ConditionChartCard logs={logs} defaultPeriod="1m" height={110} />
-      </div>
     </div>
   );
 }
