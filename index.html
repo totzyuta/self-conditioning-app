@@ -391,6 +391,9 @@ function SmoothLineChart({
   color = "#2D5A27",
   axisFontSize = 11,
   dateFontSize = 11,
+  yMinFixed = 0,
+  yMaxFixed = 10,
+  yTicks = null, // e.g. [0,2,4,6,8,10]
 }) {
   const [hovered, setHovered] = useState(null); // index of hovered point
   const svgRef = useRef(null);
@@ -407,8 +410,9 @@ function SmoothLineChart({
 
   const xMin = points[0].x, xMax = points[points.length - 1].x;
   const yVals = points.map(p => p.y);
-  const yMin = Math.max(0, Math.min(...yVals) - 0.8);
-  const yMax = Math.min(10, Math.max(...yVals) + 0.8);
+  // Keep y-axis stable (native-app-like): fixed 0..10 unless overridden.
+  const yMin = typeof yMinFixed === "number" ? yMinFixed : Math.max(0, Math.min(...yVals) - 0.8);
+  const yMax = typeof yMaxFixed === "number" ? yMaxFixed : Math.min(10, Math.max(...yVals) + 0.8);
   const yRange = yMax - yMin || 1;
   const xRange = xMax - xMin || 1;
 
@@ -454,10 +458,15 @@ function SmoothLineChart({
   const areaPath = `${linePath} L${last.px},${pad.t+ih} L${pts[0].px},${pad.t+ih} Z`;
   const neutralY = toY(5.0);
 
-  const yLabels = [];
-  for (let v = Math.ceil(yMin); v <= Math.floor(yMax); v++) {
-    if (v >= 0 && v <= 10) yLabels.push(v);
-  }
+  const yLabels = Array.isArray(yTicks) && yTicks.length
+    ? yTicks.slice()
+    : (() => {
+      const ys = [];
+      for (let v = Math.ceil(yMin); v <= Math.floor(yMax); v++) {
+        ys.push(v);
+      }
+      return ys;
+    })();
 
   const hp = hovered != null ? pts[hovered] : null;
   const tooltipX = hp ? Math.min(Math.max(hp.px, pad.l + 24), pad.l + iw - 24) : 0;
@@ -475,14 +484,54 @@ function SmoothLineChart({
         dateLabels.push(p);
       }
     });
-    // deduplicate by index
+    // deduplicate by px, then drop colliding labels (left -> right)
     const seen = new Set();
     const deduped = dateLabels.filter(p => {
-      if (seen.has(p.px)) return false;
-      seen.add(p.px); return true;
+      const k = Math.round(p.px);
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    }).sort((a, b) => a.px - b.px);
+
+    const approxTextW = (label) => {
+      // Rough width estimate for "M/D" in proportional fonts
+      const len = (label || "").length;
+      return Math.max(18, len * dateFontSize * 0.62);
+    };
+
+    const safeL = pad.l + 2;
+    const safeR = pad.l + iw - 2;
+    const GAP = 8; // px between labels to avoid overlap
+
+    const kept = [];
+    let prevRight = -Infinity;
+    deduped.forEach((p, i) => {
+      const label = p.label;
+      const wText = approxTextW(label);
+      const isFirst = i === 0;
+      const isLast = i === deduped.length - 1;
+
+      // Anchor + x clamp to keep edges inside chart area
+      let anchor = "middle";
+      let x = p.px;
+      if (isFirst) anchor = "start";
+      if (isLast) anchor = "end";
+
+      if (anchor === "start") x = Math.max(safeL, Math.min(x, safeR - wText));
+      else if (anchor === "end") x = Math.max(safeL + wText, Math.min(x, safeR));
+      else x = Math.max(safeL + wText / 2, Math.min(x, safeR - wText / 2));
+
+      const left = anchor === "start" ? x : anchor === "end" ? (x - wText) : (x - wText / 2);
+      const right = anchor === "start" ? (x + wText) : anchor === "end" ? x : (x + wText / 2);
+
+      if (left >= prevRight + GAP) {
+        kept.push({ ...p, px: x, _anchor: anchor });
+        prevRight = right;
+      }
     });
+
     dateLabels.length = 0;
-    deduped.forEach(p => dateLabels.push(p));
+    kept.forEach(p => dateLabels.push(p));
   }
 
   return (
@@ -525,7 +574,7 @@ function SmoothLineChart({
       {/* Date labels along x axis */}
       {showDateLabels && dateLabels.map((p, i) => (
         <text key={i} x={p.px} y={pad.t + ih + (dateFontSize + 8)}
-          textAnchor="middle" fontSize={dateFontSize} fill="#9B9890">{p.label}</text>
+          textAnchor={p._anchor || "middle"} fontSize={dateFontSize} fill="#9B9890">{p.label}</text>
       ))}
       {/* Hover tooltip */}
       {hp && (
@@ -703,6 +752,9 @@ function ConditionChartCard({ logs, defaultPeriod = "1m", height = 140, showReco
               showDateLabels={true}
               axisFontSize={11}
               dateFontSize={11}
+              yMinFixed={0}
+              yMaxFixed={10}
+              yTicks={[0, 2, 4, 6, 8, 10]}
             />
           </div>
           {/* Stats row */}
