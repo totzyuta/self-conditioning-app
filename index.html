@@ -96,7 +96,7 @@
 const { useState, useEffect, useCallback, useMemo, useRef } = React;
 
 /* ═══ App Version ═══════════════════════════════════════  */
-const APP_VERSION = "v1.0.4";
+const APP_VERSION = "v1.0.5";
 
 /* ═══ Storage ═══════════════════════════════════════════ */
 const SK     = "phl_tracker_v1";
@@ -1267,12 +1267,29 @@ function parseExStr(str) {
   }).filter(e => e.name || e.weight || e.reps).concat([{ name: "", weight: "", reps: "" }]).slice(0, 8);
 }
 
-function TrainingRecordScreen({ onClose, onSubmit, logs, initialDate, editLog }) {
+function TrainingRecordScreen({ onClose, onSubmit, onDelete, logs, initialDate, editLog }) {
   const [date, setDate] = useState(initialDate || todayISO());
   const [mainExs, setMainExs] = useState([{ name: "", weight: "", reps: "" }]);
   const [subExs, setSubExs]   = useState([{ name: "", weight: "", reps: "" }]);
   const [note, setNote]       = useState("");
   const [saved, setSaved]     = useState(false);
+
+  const existingForDate = useMemo(() => {
+    const d = date || (editLog?.date || initialDate || todayISO());
+    return logs.find(l => l.date === d) || null;
+  }, [date, editLog?.date, initialDate, logs]);
+
+  const canDelete = useMemo(() => {
+    const ex = existingForDate;
+    if (!ex) return false;
+    if (String(ex.id || "").startsWith("gap_")) return false;
+    if (ex.type !== "training") return false;
+    const hasMain = !!(ex.mainWorkout && ex.mainWorkout !== "—");
+    const hasSub = !!(ex.subWorkout && ex.subWorkout !== "—" && ex.subWorkout !== "なし");
+    const hasNote = !!(ex.remarks && String(ex.remarks).trim().length > 0);
+    if (!hasMain && !hasSub && !hasNote) return false;
+    return true;
+  }, [existingForDate]);
 
   useEffect(() => {
     const d = (editLog?.date || initialDate || todayISO());
@@ -1317,6 +1334,17 @@ function TrainingRecordScreen({ onClose, onSubmit, logs, initialDate, editLog })
     setTimeout(() => setSaved(false), 2000);
   };
 
+  const handleDelete = () => {
+    if (!canDelete) return;
+    const ok = window.confirm("このトレーニング記録を削除しますか？（元に戻せません）");
+    if (!ok) return;
+    try {
+      onDelete?.(existingForDate.date);
+    } finally {
+      onClose?.();
+    }
+  };
+
   return (
     <div className="fade-up" style={{ padding: "18px 16px 56px" }}>
       <div style={{
@@ -1348,7 +1376,36 @@ function TrainingRecordScreen({ onClose, onSubmit, logs, initialDate, editLog })
           <h2 style={{ flex: 1, textAlign: "center", fontSize: 14, fontWeight: 800, letterSpacing: ".02em" }}>
             {editLog ? "トレーニングを編集" : "トレーニングを記録"}
           </h2>
-          <div style={{ width: 70 }} />
+          {canDelete ? (
+            <button
+              type="button"
+              onClick={handleDelete}
+              style={{
+                width: 70,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "flex-end",
+                background: "none",
+                border: "none",
+                color: "var(--muted)",
+                padding: 0,
+              }}
+              title="削除"
+              aria-label="削除"
+              onMouseEnter={(e) => (e.currentTarget.style.color = "var(--terra)")}
+              onMouseLeave={(e) => (e.currentTarget.style.color = "var(--muted)")}
+            >
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 7h16" />
+                <path d="M9 7V5.5c0-.83.67-1.5 1.5-1.5h3C14.83 4 15.5 4.67 15.5 5.5V7" />
+                <path d="M7 7l1 14h8l1-14" />
+                <path d="M10 11v6" />
+                <path d="M14 11v6" />
+              </svg>
+            </button>
+          ) : (
+            <div style={{ width: 70 }} />
+          )}
         </div>
 
         <form onSubmit={handleSubmit}>
@@ -1493,6 +1550,7 @@ function TrainingTab({ logs, onUpsert }) {
       <TrainingRecordScreen
         onClose={() => setOpenRec(false)}
         onSubmit={(log) => { onUpsert(log); setOpenRec(false); }}
+        onDelete={(date) => { onUpsert({ __delete: true, date }); setOpenRec(false); }}
         logs={logs}
         initialDate={initialDate}
         editLog={editLog}
@@ -2067,6 +2125,28 @@ function App() {
   }, []);
 
   const addLog = useCallback(log => {
+    if (log && log.__delete && log.date) {
+      setLogs(prev => {
+        const idx = prev.findIndex(l => l.date === log.date);
+        if (idx < 0) return prev;
+        const cur = prev[idx];
+        const keepCond = (cur && cur.condition != null) ? cur.condition : null;
+        if (keepCond == null) return prev.filter(l => l.date !== log.date);
+        const n = [...prev];
+        n[idx] = {
+          ...cur,
+          condition: keepCond,
+          type: "rest",
+          mainWorkout: "—",
+          weightRepSet: "—",
+          subWorkout: "—",
+          remarks: "",
+        };
+        return n;
+      });
+      setTab("training");
+      return;
+    }
     setLogs(prev => {
       const idx = prev.findIndex(l => l.date === log.date);
       if (idx >= 0) { const n=[...prev]; n[idx]=log; return n; }
