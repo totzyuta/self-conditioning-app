@@ -1,5 +1,8 @@
-const CACHE_NAME = 'self-conditioning-v2-cache';
-const CACHE_VERSION = '1.0.0';
+// NOTE:
+// - API 応答をキャッシュすると「保存→少し後に古い GET が返って state が巻き戻る」事故が起きる。
+// - キャッシュは静的アセット専用にする（/api/* は network-only）。
+const CACHE_VERSION = '1.0.1';
+const CACHE_NAME = `self-conditioning-v2-cache-${CACHE_VERSION}`;
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -42,6 +45,17 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
+
+  // Never cache non-GET.
+  if (request.method !== 'GET') {
+    return;
+  }
+
+  // API は常に network（キャッシュするとデータが巻き戻る）
+  if (url.pathname.startsWith('/api/')) {
+    event.respondWith(fetch(request));
+    return;
+  }
 
   // index.html は network first
   if (url.pathname === '/' || url.pathname.endsWith('index.html')) {
