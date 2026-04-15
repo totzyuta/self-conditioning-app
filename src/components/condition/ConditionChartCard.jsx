@@ -82,9 +82,9 @@ export default function ConditionChartCard({ v2, defaultPeriod = "1m", height = 
         </div>
       </div>
 
-      {chartPoints.length >= 2 ? (
-        <>
-          <div ref={chartWrapRef}>
+      <div ref={chartWrapRef}>
+        {chartPoints.length >= 2 ? (
+          <>
             <SmoothLineChart
               points={chartPoints}
               w={chartW}
@@ -98,30 +98,30 @@ export default function ConditionChartCard({ v2, defaultPeriod = "1m", height = 
               yMaxFixed={10}
               yTicks={[0, 2, 4, 6, 8, 10]}
             />
+            {/* Stats row */}
+            <div style={{ display: "flex", borderTop: "1px solid var(--border)", marginTop: 12 }}>
+              {[
+                { label: "平均", val: avg != null ? avg.toFixed(2) : "—" },
+                { label: "最高", val: maxV != null ? maxV.toFixed(1) : "—" },
+                { label: "最低", val: minV != null ? minV.toFixed(1) : "—" },
+                { label: "記録", val: withCond.length },
+              ].map((s, i) => (
+                <div key={i} style={{
+                  flex: 1, textAlign: "center", padding: "10px 4px",
+                  borderRight: i < 3 ? "1px solid var(--border)" : "none",
+                }}>
+                  <div style={{ fontSize: 9, color: "var(--muted)", letterSpacing: ".08em", marginBottom: 3 }}>{s.label}</div>
+                  <div style={{ fontSize: 15, fontWeight: 300, color: "var(--text)", letterSpacing: "-0.5px" }}>{s.val}</div>
+                </div>
+              ))}
+            </div>
+          </>
+        ) : (
+          <div style={{ textAlign: "center", padding: "32px 0", color: "var(--muted)", fontSize: 12 }}>
+            この期間のコンディションデータがありません
           </div>
-          {/* Stats row */}
-          <div style={{ display: "flex", borderTop: "1px solid var(--border)", marginTop: 12 }}>
-            {[
-              { label: "平均", val: avg != null ? avg.toFixed(2) : "—" },
-              { label: "最高", val: maxV != null ? maxV.toFixed(1) : "—" },
-              { label: "最低", val: minV != null ? minV.toFixed(1) : "—" },
-              { label: "記録", val: withCond.length },
-            ].map((s, i) => (
-              <div key={i} style={{
-                flex: 1, textAlign: "center", padding: "10px 4px",
-                borderRight: i < 3 ? "1px solid var(--border)" : "none",
-              }}>
-                <div style={{ fontSize: 9, color: "var(--muted)", letterSpacing: ".08em", marginBottom: 3 }}>{s.label}</div>
-                <div style={{ fontSize: 15, fontWeight: 300, color: "var(--text)", letterSpacing: "-0.5px" }}>{s.val}</div>
-              </div>
-            ))}
-          </div>
-        </>
-      ) : (
-        <div style={{ textAlign: "center", padding: "32px 0", color: "var(--muted)", fontSize: 12 }}>
-          この期間のコンディションデータがありません
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Optional record form */}
       {showRecord && (

@@ -1,15 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
-import CondOrb from "../components/condition/CondOrb.jsx";
+import { fmtDate, todayISO } from "../lib/format.js";
+import StepsChartCard from "../components/steps/StepsChartCard.jsx";
+import StepsRecordScreen from "../components/steps/StepsRecordScreen.jsx";
 
-export default function ConditionTab({
-  v2,
-  onSaveConditionDay,
-  todayISO,
-  fmtDate,
-  ConditionChartCard,
-  ConditionRecordScreen,
-  hideTopChart = false,
-}) {
+export default function StepsTab({ v2, onSaveStepsDay }) {
   const [openRec, setOpenRec] = useState(false);
   const [editDate, setEditDate] = useState(null);
   const [initialDate, setInitialDate] = useState(todayISO());
@@ -18,11 +12,11 @@ export default function ConditionTab({
   const [selectedMonth, setSelectedMonth] = useState(() => todayISO().slice(0, 7));
 
   const rows = useMemo(() => {
-    return Object.entries(v2.conditionsByDate || {})
-      .filter(([, row]) => row && (row.score != null || String(row.note || "").trim()))
+    return Object.entries(v2.stepsByDate || {})
+      .filter(([, row]) => row && (row.steps != null || String(row.note || "").trim()))
       .map(([date, row]) => ({
         date,
-        score: row.score,
+        steps: row.steps,
         note: String(row.note || ""),
       }))
       .sort((a, b) => (a.date < b.date ? 1 : -1));
@@ -68,11 +62,11 @@ export default function ConditionTab({
 
   if (openRec) {
     return (
-      <ConditionRecordScreen
+      <StepsRecordScreen
         v2={v2}
         onClose={() => { setOpenRec(false); setEditDate(null); }}
         onSubmit={(payload) => {
-          onSaveConditionDay(payload);
+          onSaveStepsDay(payload);
           setOpenRec(false);
           setEditDate(null);
         }}
@@ -85,7 +79,7 @@ export default function ConditionTab({
   return (
     <div className="fade-up" style={{ paddingBottom: 48 }}>
       <div style={{ padding: "24px 24px 0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h2 style={{ fontSize: 13, fontWeight: 600, letterSpacing: ".05em" }}>コンディション</h2>
+        <h2 style={{ fontSize: 13, fontWeight: 600, letterSpacing: ".05em" }}>歩数</h2>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <span style={{ fontSize: 11, color: "var(--muted)" }}>{filtered.length} entries</span>
           <button
@@ -96,23 +90,16 @@ export default function ConditionTab({
               padding: "8px 12px", borderRadius: 9, fontSize: 11, fontWeight: 700,
               letterSpacing: ".06em", boxShadow: "0 3px 14px rgba(196,97,58,.22)",
             }}
-            title="コンディションを記録"
+            title="歩数を記録"
           >
             記録する
           </button>
         </div>
       </div>
 
-      {!hideTopChart && (
-        <div style={{ padding: "14px 24px 0" }}>
-          <ConditionChartCard
-            v2={v2}
-            defaultPeriod="1m"
-            height={140}
-            showRecord={false}
-          />
-        </div>
-      )}
+      <div style={{ padding: "14px 24px 0" }}>
+        <StepsChartCard v2={v2} defaultPeriod="1m" height={140} />
+      </div>
 
       <div style={{ display: "flex", gap: 10, padding: "18px 24px 0", alignItems: "center" }}>
         <button
@@ -167,14 +154,14 @@ export default function ConditionTab({
           <thead>
             <tr>
               <th style={{ width: 64 }}>日付</th>
-              <th style={{ width: 52 }}>スコア</th>
-              <th style={{ minWidth: 200 }}>コンディションメモ</th>
+              <th style={{ width: 90 }}>歩数</th>
+              <th style={{ minWidth: 200 }}>メモ</th>
             </tr>
           </thead>
           <tbody>
             {filtered.map((row, idx) => {
               const d = fmtDate(row.date);
-              const id = `c_${row.date}`;
+              const id = `s_${row.date}`;
               const isExp = expanded.has(id);
               const hasNote = row.note && row.note.length > 0;
               const isLong = row.note && row.note.length > 48;
@@ -200,7 +187,9 @@ export default function ConditionTab({
                     <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 1 }}>{d.wdJA}</div>
                   </td>
                   <td style={{ paddingTop: 11, paddingBottom: 11 }}>
-                    <CondOrb value={row.score} size={40} palette="band" />
+                    <div style={{ fontVariantNumeric: "tabular-nums", fontWeight: 700, fontSize: 14, color: "var(--green)" }}>
+                      {row.steps != null ? Number(row.steps).toLocaleString() : "—"}
+                    </div>
                   </td>
                   <td>
                     {hasNote ? (
@@ -235,3 +224,4 @@ export default function ConditionTab({
     </div>
   );
 }
+

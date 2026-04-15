@@ -7,7 +7,9 @@ export const LOGIN_ALLOWED = [
 export const APP_VERSION = "2.0.0";
 
 export const TABS = [
-  { id: "dashboard", label: "ダッシュボード" },
-  { id: "condition", label: "コンディション" },
-  { id: "training", label: "トレーニング" },
+  { id: "kokoro", label: "こころ", icon: "wave" },
+  { id: "undou", label: "運動", icon: "dumbbell" },
+  { id: "steps", label: "歩数", icon: "foot" },
+  { id: "weight", label: "体重", icon: "scale" },
+  { id: "user", label: "ユーザー", icon: "user" },
 ];

@@ -28,6 +28,30 @@ create table if not exists public.conditions (
 
 create index if not exists idx_conditions_user_date on public.conditions(user_id, date);
 
+-- Steps (1 per day)
+create table if not exists public.steps (
+  user_id text not null references public.users(id) on delete cascade,
+  date date not null,
+  steps int,
+  note text not null default '',
+  updated_at timestamptz not null default now(),
+  primary key (user_id, date)
+);
+
+create index if not exists idx_steps_user_date on public.steps(user_id, date);
+
+-- Weight (1 per day)
+create table if not exists public.weights (
+  user_id text not null references public.users(id) on delete cascade,
+  date date not null,
+  weight numeric,
+  note text not null default '',
+  updated_at timestamptz not null default now(),
+  primary key (user_id, date)
+);
+
+create index if not exists idx_weights_user_date on public.weights(user_id, date);
+
 -- Training session header (1 per day)
 create table if not exists public.training_sessions (
   user_id text not null references public.users(id) on delete cascade,
@@ -68,6 +92,16 @@ $$ language plpgsql;
 drop trigger if exists trg_conditions_updated_at on public.conditions;
 create trigger trg_conditions_updated_at
 before update on public.conditions
+for each row execute procedure public.set_updated_at();
+
+drop trigger if exists trg_steps_updated_at on public.steps;
+create trigger trg_steps_updated_at
+before update on public.steps
+for each row execute procedure public.set_updated_at();
+
+drop trigger if exists trg_weights_updated_at on public.weights;
+create trigger trg_weights_updated_at
+before update on public.weights
 for each row execute procedure public.set_updated_at();
 
 drop trigger if exists trg_training_sessions_updated_at on public.training_sessions;

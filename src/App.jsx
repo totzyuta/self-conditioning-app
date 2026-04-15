@@ -1,8 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import DashboardTab from "./pages/DashboardTab.jsx";
 import ConditionTabPage from "./pages/ConditionTab.jsx";
 import TrainingTabPage from "./pages/TrainingTab.jsx";
+import KokoroTab from "./pages/KokoroTab.jsx";
+import StepsTab from "./pages/StepsTab.jsx";
+import WeightTab from "./pages/WeightTab.jsx";
+import UserTab from "./pages/UserTab.jsx";
 import { V2_SEED_DAYS } from "./seed/v2Seed.js";
 import { APP_VERSION } from "./lib/constants.js";
 import { SESSION_KEY, readSession } from "./lib/session.js";
@@ -29,6 +32,7 @@ import SessionMiniCard from "./components/condition/SessionMiniCard.jsx";
 import TrainingRecordScreen from "./components/training/TrainingRecordScreen.jsx";
 import ConditionRecordScreen from "./components/condition/ConditionRecordScreen.jsx";
 import AppHeaderTabs from "./components/layout/AppHeaderTabs.jsx";
+import BottomNav, { BOTTOM_NAV_TOTAL_PX } from "./components/layout/BottomNav.jsx";
 import SettingsSheet from "./components/layout/SettingsSheet.jsx";
 import UpdateAvailableBar from "./components/layout/UpdateAvailableBar.jsx";
 import AppFooterMark from "./components/layout/AppFooterMark.jsx";
@@ -52,7 +56,7 @@ export default function App() {
   const [syncErr, setSyncErr] = useState(null);
   /** 全画面ブロックは「シードデータにリセット」実行中のみ */
   const [seedResetBlocking, setSeedResetBlocking] = useState(false);
-  const [tab, setTab] = useState("dashboard");
+  const [tab, setTab] = useState("kokoro");
   const [updateAvailable, setUpdateAvailable] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const swRef = useRef(null);
@@ -127,7 +131,7 @@ export default function App() {
     setSyncUserId(null);
     setSyncPassword(null);
     setV2(emptyV2State(""));
-    setTab("dashboard");
+    setTab("kokoro");
   };
 
   const handleForceUpdate = () => {
@@ -230,7 +234,7 @@ export default function App() {
         setSyncErr(msg);
         try { await refetchRemoteV2(); } catch (_) {}
       }
-      setTab("training");
+      setTab("undou");
       return;
     }
 
@@ -287,7 +291,7 @@ export default function App() {
       try { await refetchRemoteV2(); } catch (_) {}
     }
 
-    setTab("training");
+    setTab("undou");
   }, [v2, refetchRemoteV2, syncUserId, syncPassword]);
 
   const saveConditionDay = useCallback(async ({ date, conditionScore, conditionNote }) => {
@@ -317,6 +321,76 @@ export default function App() {
         date,
         conditionScore: score,
         conditionNote: cn,
+        clientLast,
+      });
+      setSyncErr(null);
+    } catch (e) {
+      const msg = e?.code === 409 ? "サーバー側が先に更新されています。再同期しました。" : (e?.message || "sync failed");
+      setSyncErr(msg);
+      try { await refetchRemoteV2(); } catch (_) {}
+    }
+  }, [v2, refetchRemoteV2, syncUserId, syncPassword]);
+
+  const saveStepsDay = useCallback(async ({ date, steps, stepsNote }) => {
+    const st = steps === undefined ? undefined : (steps === null ? null : Math.trunc(Number(steps)));
+    const sn = typeof stepsNote === "string" ? stepsNote : "";
+    const clientLast = {
+      stepsUpdatedAt: v2.stepsByDate?.[date]?.updatedAt || null,
+    };
+    const nowIso = new Date().toISOString();
+    setV2(prev => {
+      const next = { ...prev };
+      next.stepsByDate = { ...(prev.stepsByDate || {}) };
+      next.stepsByDate[date] = {
+        steps: st === undefined ? (prev.stepsByDate?.[date]?.steps ?? null) : st,
+        note: sn,
+        updatedAt: nowIso,
+      };
+      return next;
+    });
+
+    try {
+      await putRemoteDayV2({
+        userId: syncUserId,
+        password: syncPassword,
+        date,
+        steps: st === undefined ? null : st,
+        stepsNote: sn,
+        clientLast,
+      });
+      setSyncErr(null);
+    } catch (e) {
+      const msg = e?.code === 409 ? "サーバー側が先に更新されています。再同期しました。" : (e?.message || "sync failed");
+      setSyncErr(msg);
+      try { await refetchRemoteV2(); } catch (_) {}
+    }
+  }, [v2, refetchRemoteV2, syncUserId, syncPassword]);
+
+  const saveWeightDay = useCallback(async ({ date, weight, weightNote }) => {
+    const w = weight === undefined ? undefined : (weight === null ? null : Number(weight));
+    const wn = typeof weightNote === "string" ? weightNote : "";
+    const clientLast = {
+      weightsUpdatedAt: v2.weightByDate?.[date]?.updatedAt || null,
+    };
+    const nowIso = new Date().toISOString();
+    setV2(prev => {
+      const next = { ...prev };
+      next.weightByDate = { ...(prev.weightByDate || {}) };
+      next.weightByDate[date] = {
+        weight: w === undefined ? (prev.weightByDate?.[date]?.weight ?? null) : w,
+        note: wn,
+        updatedAt: nowIso,
+      };
+      return next;
+    });
+
+    try {
+      await putRemoteDayV2({
+        userId: syncUserId,
+        password: syncPassword,
+        date,
+        weight: w === undefined ? null : w,
+        weightNote: wn,
         clientLast,
       });
       setSyncErr(null);
@@ -383,6 +457,10 @@ export default function App() {
             date: day.date,
             conditionScore: day.conditionScore === undefined ? null : day.conditionScore,
             conditionNote: typeof day.conditionNote === "string" ? day.conditionNote : "",
+            steps: day.steps === undefined ? null : day.steps,
+            stepsNote: typeof day.stepsNote === "string" ? day.stepsNote : "",
+            weight: day.weight === undefined ? null : day.weight,
+            weightNote: typeof day.weightNote === "string" ? day.weightNote : "",
             note: typeof day.note === "string" ? day.note : "",
             items,
             clientLast: null,
@@ -508,15 +586,12 @@ export default function App() {
 
       <AppHeaderTabs
         syncUserId={syncUserId}
-        tab={tab}
-        setTab={setTab}
-        onToggleSettings={() => setShowSettings(s => !s)}
       />
 
-      <main>
-        {tab === "dashboard" && (
-          <DashboardTab
-            key="db"
+      <main style={{ paddingBottom: BOTTOM_NAV_TOTAL_PX }}>
+        {tab === "kokoro" && (
+          <KokoroTab
+            key="kokoro"
             v2={v2}
             daySummaries={daySummaries}
             todayISO={todayISO}
@@ -524,23 +599,15 @@ export default function App() {
             DateHeader={DateHeader}
             OSBar={OSBar}
             ConditionChartCard={ConditionChartCard}
-            SessionMiniCard={SessionMiniCard}
-          />
-        )}
-        {tab === "condition" && (
-          <ConditionTabPage
-            key="cond"
-            v2={v2}
+            ConditionTabPage={ConditionTabPage}
             onSaveConditionDay={saveConditionDay}
-            todayISO={todayISO}
             fmtDate={fmtDate}
-            ConditionChartCard={ConditionChartCard}
             ConditionRecordScreen={ConditionRecordScreen}
           />
         )}
-        {tab === "training" && (
+        {tab === "undou" && (
           <TrainingTabPage
-            key="train"
+            key="undou"
             v2={v2}
             daySummaries={daySummaries}
             onUpsert={addLog}
@@ -550,7 +617,32 @@ export default function App() {
             TrainingRecordScreen={TrainingRecordScreen}
           />
         )}
+        {tab === "steps" && (
+          <StepsTab
+            key="steps"
+            v2={v2}
+            onSaveStepsDay={saveStepsDay}
+          />
+        )}
+        {tab === "weight" && (
+          <WeightTab
+            key="weight"
+            v2={v2}
+            onSaveWeightDay={saveWeightDay}
+          />
+        )}
+        {tab === "user" && (
+          <UserTab
+            key="user"
+            syncUserId={syncUserId}
+            syncErr={syncErr}
+            onLogout={handleLogout}
+            onOpenSettings={() => setShowSettings(true)}
+          />
+        )}
       </main>
+
+      <BottomNav tab={tab} setTab={setTab} />
 
       {showSettings && (
         <SettingsSheet

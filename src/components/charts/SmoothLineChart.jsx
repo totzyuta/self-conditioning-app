@@ -13,6 +13,7 @@ export default function SmoothLineChart({
   yMinFixed = 0,
   yMaxFixed = 10,
   yTicks = null, // e.g. [0,2,4,6,8,10]
+  formatY,
 }) {
   const [hovered, setHovered] = useState(null); // index of hovered point
   const svgRef = useRef(null);
@@ -93,6 +94,7 @@ export default function SmoothLineChart({
   const TOOLTIP_H = 50;
   const TOOLTIP_GAP = 14; // space between point and tooltip (finger-friendly)
   const tooltipTop = hp ? Math.max(hp.py - (TOOLTIP_H + TOOLTIP_GAP), pad.t + 2) : 0;
+  const fmtY = typeof formatY === "function" ? formatY : (v => Number(v).toFixed(1));
 
   // Date labels: show up to ~6 evenly-spaced labels along x axis
   const dateLabels = [];
@@ -211,7 +213,7 @@ export default function SmoothLineChart({
           <text x={tooltipX} y={tooltipTop + 18} textAnchor="middle"
             fontSize={11} fill="#fff" opacity={0.9}>{hp.label}</text>
           <text x={tooltipX} y={tooltipTop + 38} textAnchor="middle"
-            fontSize={16} fill="#fff" fontWeight="700">{hp.y.toFixed(1)}</text>
+            fontSize={16} fill="#fff" fontWeight="700">{fmtY(hp.y)}</text>
         </g>
       )}
     </svg>
