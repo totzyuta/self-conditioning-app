@@ -90,6 +90,10 @@ export default function StepsChartCard({ v2, defaultPeriod = "1m", height = 140 
               yMinFixed={0}
               yMaxFixed={yTicks[yTicks.length - 1]}
               yTicks={yTicks}
+              formatY={(v) => {
+                const n = Math.round(Number(v));
+                return Number.isFinite(n) ? n.toLocaleString() : "—";
+              }}
             />
           </div>
           <div style={{ display: "flex", borderTop: "1px solid var(--border)", marginTop: 12 }}>
