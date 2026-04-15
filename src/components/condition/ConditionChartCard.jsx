@@ -3,7 +3,7 @@ import SmoothLineChart from "../charts/SmoothLineChart.jsx";
 import { PERIODS, LABEL_S } from "./chartConstants.js";
 import { useIsMobile } from "../../hooks/useIsMobile.js";
 import { useElementWidth } from "../../hooks/useElementWidth.js";
-import { condLabelColor, fmtDate, todayISO } from "../../lib/format.js";
+import { condColor, fmtDate, todayISO } from "../../lib/format.js";
 
 export default function ConditionChartCard({ v2, defaultPeriod = "1m", height = 140, showRecord = false, onUpdateCondition }) {
   const [period, setPeriod]   = useState(defaultPeriod);
@@ -43,7 +43,7 @@ export default function ConditionChartCard({ v2, defaultPeriod = "1m", height = 
   const existingRow = v2.conditionsByDate?.[date];
   const existingCond = existingRow?.score != null ? Number(existingRow.score) : null;
   const cv = parseFloat(cond);
-  const cc = condLabelColor(cv);
+  const cc = condColor(cv);
   const pct = (cv / 10) * 100;
 
   const handleSave = () => {
@@ -133,7 +133,7 @@ export default function ConditionChartCard({ v2, defaultPeriod = "1m", height = 
               style={{ width: "100%", boxSizing: "border-box", padding: "7px 6px", fontSize: "16px" }} />
             {existingCond != null && (
               <div style={{ marginTop: 5, fontSize: 11, color: "var(--muted)" }}>
-                記録済み: <span style={{ color: condLabelColor(existingCond), fontWeight: 700 }}>{existingCond.toFixed(1)}</span>（上書き可）
+                記録済み: <span style={{ color: condColor(existingCond), fontWeight: 700 }}>{existingCond.toFixed(1)}</span>（上書き可）
               </div>
             )}
           </div>

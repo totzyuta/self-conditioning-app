@@ -1,8 +1,8 @@
 import React from "react";
-import { condLabelColor } from "../../lib/format.js";
+import { condColor } from "../../lib/format.js";
 
 export default function CondOrb({ value, size = 42 }) {
-  const c = condLabelColor(value);
+  const c = condColor(value);
   return (
     <div style={{
       width: size, height: size, borderRadius: "50%",

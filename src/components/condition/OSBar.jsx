@@ -1,9 +1,9 @@
 import React from "react";
-import { condLabelColor } from "../../lib/format.js";
+import { condColor } from "../../lib/format.js";
 
 export default function OSBar({ value }) {
   const pct = (value / 10) * 100;
-  const c = condLabelColor(value);
+  const c = condColor(value);
   const diff = value - 5.0;
   return (
     <div>

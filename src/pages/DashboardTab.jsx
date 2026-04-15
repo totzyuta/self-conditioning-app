@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { condLabelColor } from "../lib/format.js";
+import { condColor, condLabelColor } from "../lib/format.js";
 
 export default function DashboardTab({
   v2,
@@ -16,7 +16,8 @@ export default function DashboardTab({
 
   const todayCond = v2.conditionsByDate?.[today]?.score;
   const todayCondNote = (v2.conditionsByDate?.[today]?.note || "").trim();
-  const c = todayCond != null ? condLabelColor(Number(todayCond)) : "#9B9890";
+  const c = condColor(todayCond != null ? todayCond : null);
+  const bandLabelColor = todayCond != null ? condLabelColor(Number(todayCond)) : "#9B9890";
 
   const recentSessions = useMemo(() => {
     const sorted = [...summaries].sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -48,7 +49,7 @@ export default function DashboardTab({
         </div>
         <div style={{ marginTop: 10, animation: "fadeUp .4s .5s both" }}>
           {todayCond != null ? (
-            <span style={{ fontSize: 12, color: c }}>{condLabel(Number(todayCond))}</span>
+            <span style={{ fontSize: 12, color: bandLabelColor }}>{condLabel(Number(todayCond))}</span>
           ) : (
             <span style={{ fontSize: 11, color: "var(--muted)" }}>本日の記録なし</span>
           )}

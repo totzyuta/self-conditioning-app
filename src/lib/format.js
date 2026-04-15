@@ -30,7 +30,7 @@ export function condLabel(v) {
   return "Very high";
 }
 
-/** Tier color aligned with condLabel() — orbs, sliders, dashboard hero. */
+/** Tier color for condLabel() text only (Very low … Very high). Numbers/sliders use condColor. */
 export function condLabelColor(v) {
   if (v == null) return "#9B9890";
   const n = Number(v);
