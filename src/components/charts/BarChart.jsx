@@ -41,11 +41,11 @@ export default function BarChart({
   const bars = points.map((p, i) => {
     const cx = pad.l + stepX * i + stepX / 2;
     const x = Math.round(cx - barW / 2);
-    const y = Math.round(toY(p.y));
+    const yPx = Math.round(toY(p.y));
     const y0 = Math.round(toY(yMinFixed ?? 0));
-    const top = Math.min(y, y0);
-    const bottom = Math.max(y, y0);
-    return { ...p, i, cx, x, y, top, bottom, h: Math.max(1, bottom - top) };
+    const top = Math.min(yPx, y0);
+    const bottom = Math.max(yPx, y0);
+    return { ...p, i, cx, x, yPx, top, bottom, h: Math.max(1, bottom - top) };
   });
 
   const yLabels = Array.isArray(yTicks) && yTicks.length
