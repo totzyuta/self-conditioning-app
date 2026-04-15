@@ -6,7 +6,7 @@ export default function SmoothLineChart({
   h = 130,
   showNeutral = true,
   showDateLabels = false,
-  color = "#2D5A27",
+  color = "#9B9890",
   axisFontSize = 11,
   dateFontSize = 11,
   yMinFixed = 0,

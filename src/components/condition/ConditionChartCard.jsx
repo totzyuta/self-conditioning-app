@@ -39,6 +39,7 @@ export default function ConditionChartCard({ v2, defaultPeriod = "1m", height = 
   const avg  = withCond.length ? (withCond.reduce((a,b)=>a+b,0)/withCond.length) : null;
   const maxV = withCond.length ? Math.max(...withCond) : null;
   const minV = withCond.length ? Math.min(...withCond) : null;
+  const chartLineColor = avg != null ? condColor(avg) : "#9B9890";
 
   const existingRow = v2.conditionsByDate?.[date];
   const existingCond = existingRow?.score != null ? Number(existingRow.score) : null;
@@ -89,6 +90,7 @@ export default function ConditionChartCard({ v2, defaultPeriod = "1m", height = 
               points={chartPoints}
               w={chartW}
               h={isMobile ? Math.round(height * 1.5) : height}
+              color={chartLineColor}
               showNeutral={true}
               showDateLabels={true}
               axisFontSize={11}
@@ -111,7 +113,7 @@ export default function ConditionChartCard({ v2, defaultPeriod = "1m", height = 
                 borderRight: i < 3 ? "1px solid var(--border)" : "none",
               }}>
                 <div style={{ fontSize: 9, color: "var(--muted)", letterSpacing: ".08em", marginBottom: 3 }}>{s.label}</div>
-                <div style={{ fontSize: 15, fontWeight: 300, color: "var(--green)", letterSpacing: "-0.5px" }}>{s.val}</div>
+                <div style={{ fontSize: 15, fontWeight: 300, color: "var(--text)", letterSpacing: "-0.5px" }}>{s.val}</div>
               </div>
             ))}
           </div>
