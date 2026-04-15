@@ -3,6 +3,29 @@
  * 日付順に PUT する。
  */
 export const V2_SEED_DAYS = [
+  // Weight seed (2026-01..04)
+  { date: "2026-01-12", weight: 60.6 },
+  { date: "2026-01-14", weight: 60.1 },
+  { date: "2026-01-15", weight: 59.8 },
+  { date: "2026-01-16", weight: 59.9 },
+  { date: "2026-01-18", weight: 60.1 },
+  { date: "2026-01-19", weight: 59.5 },
+  { date: "2026-01-21", weight: 59.4 },
+  { date: "2026-01-24", weight: 59.3 },
+  { date: "2026-01-25", weight: 59.9 },
+  { date: "2026-01-27", weight: 60.7 },
+  { date: "2026-01-28", weight: 60.6 },
+  { date: "2026-01-29", weight: 59.5 },
+  { date: "2026-01-30", weight: 59.0 },
+  { date: "2026-01-31", weight: 60.3 },
+  { date: "2026-02-01", weight: 60.0 },
+  { date: "2026-02-02", weight: 60.1 },
+  { date: "2026-02-04", weight: 60.2 },
+  { date: "2026-02-09", weight: 60.3 },
+  { date: "2026-02-13", weight: 60.2 },
+  { date: "2026-02-20", weight: 60.2 },
+  { date: "2026-02-24", weight: 60.0 },
+  { date: "2026-02-27", weight: 60.3 },
   {
     date: "2026-02-14",
     conditionScore: null,
@@ -28,6 +51,7 @@ export const V2_SEED_DAYS = [
     date: "2026-02-27",
     conditionScore: null,
     note: "低負荷のダンベル種目で胸の収縮を確認。肩や手首の違和感に対応。\n技術練習",
+    weight: 60.3,
     items: [
       { category: "main", exerciseName: "DBP", weight: "8kg", reps: "10*3", sortOrder: 0 },
       { category: "main", exerciseName: "DF", weight: "8kg", reps: "10*3", sortOrder: 1 },
@@ -66,6 +90,7 @@ export const V2_SEED_DAYS = [
     conditionScore: 4.8,
     conditionNote: "ジム復帰初日。メンタルは上向き。",
     note: "かなり久しぶりのトレーニング。やっとやっと、回復して来た気がする。ベンチプレスで、かなり回復。\nテンポ 3s",
+    weight: 60.6,
     items: [
       { category: "main", exerciseName: "BP (ベンチプレス)", weight: "40kg", reps: "(10,10,9)", sortOrder: 0 },
       { category: "sub", exerciseName: "BB-Curl", weight: "20kg", reps: "(7,7,6)", sortOrder: 0 },
@@ -102,6 +127,7 @@ export const V2_SEED_DAYS = [
     date: "2026-03-18",
     conditionScore: null,
     note: "背中の感覚はまだ。二頭筋に熱感がある。\nテンポ 3s",
+    weight: 59.7,
     items: [
       { category: "main", exerciseName: "PU (懸垂)", weight: "🟣バンド", reps: "(10,7,6)", sortOrder: 0 },
       { category: "sub", exerciseName: "LPD", weight: "30kg", reps: "10*3", sortOrder: 0 },
@@ -118,12 +144,18 @@ export const V2_SEED_DAYS = [
     date: "2026-03-21",
     conditionScore: 6.0,
     note: "BP 45kg初挑戦完遂。腕のボリュームも狙った構成。コンディション6.0到達！\nテンポ 3s",
+    weight: 59.3,
     items: [
       { category: "main", exerciseName: "BP (ベンチプレス)", weight: "45kg", reps: "(5,5,5)", sortOrder: 0 },
       { category: "sub", exerciseName: "SC", weight: "15kg", reps: "10*3", sortOrder: 0 },
       { category: "sub", exerciseName: "IC", weight: "9kg", reps: "(10,7,7)", sortOrder: 1 },
     ],
   },
+
+  { date: "2026-03-02", weight: 60.2 },
+  { date: "2026-03-04", weight: 60.4 },
+  { date: "2026-03-06", weight: 60.1 },
+  { date: "2026-04-03", weight: 59.3 },
   {
     date: "2026-03-22",
     conditionScore: null,

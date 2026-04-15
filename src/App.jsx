@@ -457,6 +457,8 @@ export default function App() {
             date: day.date,
             conditionScore: day.conditionScore === undefined ? null : day.conditionScore,
             conditionNote: typeof day.conditionNote === "string" ? day.conditionNote : "",
+            weight: day.weight === undefined ? null : day.weight,
+            weightNote: typeof day.weightNote === "string" ? day.weightNote : "",
             note: typeof day.note === "string" ? day.note : "",
             items,
             clientLast: null,
