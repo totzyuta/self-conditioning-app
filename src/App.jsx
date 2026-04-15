@@ -234,7 +234,7 @@ export default function App() {
         setSyncErr(msg);
         try { await refetchRemoteV2(); } catch (_) {}
       }
-      setTab("training");
+      setTab("undou");
       return;
     }
 
@@ -291,7 +291,7 @@ export default function App() {
       try { await refetchRemoteV2(); } catch (_) {}
     }
 
-    setTab("training");
+    setTab("undou");
   }, [v2, refetchRemoteV2, syncUserId, syncPassword]);
 
   const saveConditionDay = useCallback(async ({ date, conditionScore, conditionNote }) => {
