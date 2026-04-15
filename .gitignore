@@ -1,2 +1,28 @@
 .vercel
 .env*.local
+
+# Local DB dumps (may contain PII)
+backups/
+
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+.next/
+
+# Logs
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Editor / OS
+.vscode/
+.DS_Store
+
+# Stray Next.js artifact (this repo is Vite)
+next-env.d.ts
+
+# Supabase CLI local cache
+supabase/.temp/
