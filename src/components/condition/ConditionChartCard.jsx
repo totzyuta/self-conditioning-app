@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import SmoothLineChart from "../charts/SmoothLineChart.jsx";
-import { PERIODS, LABEL_S } from "./chartConstants.js";
+import { CONDITION_CHART_LINE_COLOR, PERIODS, LABEL_S } from "./chartConstants.js";
 import { useIsMobile } from "../../hooks/useIsMobile.js";
 import { useElementWidth } from "../../hooks/useElementWidth.js";
 import { condColor, fmtDate, todayISO } from "../../lib/format.js";
@@ -89,6 +89,7 @@ export default function ConditionChartCard({ v2, defaultPeriod = "1m", height = 
               points={chartPoints}
               w={chartW}
               h={isMobile ? Math.round(height * 1.5) : height}
+              color={CONDITION_CHART_LINE_COLOR}
               showNeutral={true}
               showDateLabels={true}
               axisFontSize={11}
@@ -111,7 +112,7 @@ export default function ConditionChartCard({ v2, defaultPeriod = "1m", height = 
                 borderRight: i < 3 ? "1px solid var(--border)" : "none",
               }}>
                 <div style={{ fontSize: 9, color: "var(--muted)", letterSpacing: ".08em", marginBottom: 3 }}>{s.label}</div>
-                <div style={{ fontSize: 15, fontWeight: 300, color: "var(--green)", letterSpacing: "-0.5px" }}>{s.val}</div>
+                <div style={{ fontSize: 15, fontWeight: 300, color: "var(--text)", letterSpacing: "-0.5px" }}>{s.val}</div>
               </div>
             ))}
           </div>

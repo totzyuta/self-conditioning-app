@@ -1,4 +1,5 @@
 import React, { useState, useRef } from "react";
+import { CONDITION_CHART_LINE_COLOR } from "../condition/chartConstants.js";
 
 export default function SmoothLineChart({
   points,
@@ -6,7 +7,7 @@ export default function SmoothLineChart({
   h = 130,
   showNeutral = true,
   showDateLabels = false,
-  color = "#2D5A27",
+  color = CONDITION_CHART_LINE_COLOR,
   axisFontSize = 11,
   dateFontSize = 11,
   yMinFixed = 0,
@@ -157,11 +158,17 @@ export default function SmoothLineChart({
       ref={svgRef}
       width="100%" viewBox={`0 0 ${w} ${h}`}
       preserveAspectRatio="xMidYMid meet"
-      style={{ display: "block", overflow: "visible", cursor: "crosshair" }}
+      style={{
+        display: "block",
+        overflow: "visible",
+        cursor: "crosshair",
+        // Avoid preventDefault on touchmove (passive listeners); still block scroll-steal on chart scrub
+        touchAction: "none",
+      }}
       onMouseMove={handlePointer}
       onMouseLeave={() => setHovered(null)}
       onTouchStart={handlePointer}
-      onTouchMove={e => { e.preventDefault(); handlePointer(e); }}
+      onTouchMove={handlePointer}
       onTouchEnd={() => setHovered(null)}
     >
       {yLabels.map(v => (

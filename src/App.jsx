@@ -16,7 +16,6 @@ import {
 } from "./lib/v2State.js";
 import {
   asNullableScore,
-  condColor,
   condLabel,
   fmtDate,
   todayISO,
@@ -28,6 +27,7 @@ import CondOrb from "./components/condition/CondOrb.jsx";
 import OSBar from "./components/condition/OSBar.jsx";
 import SessionMiniCard from "./components/condition/SessionMiniCard.jsx";
 import TrainingRecordScreen from "./components/training/TrainingRecordScreen.jsx";
+import ConditionRecordScreen from "./components/condition/ConditionRecordScreen.jsx";
 import AppHeaderTabs from "./components/layout/AppHeaderTabs.jsx";
 import SettingsSheet from "./components/layout/SettingsSheet.jsx";
 import UpdateAvailableBar from "./components/layout/UpdateAvailableBar.jsx";
@@ -196,38 +196,39 @@ export default function App() {
 
     // Delete training for day (keep condition if any)
     if (log.__delete) {
+      const clientLast = {
+        conditionsUpdatedAt: v2.conditionsByDate?.[date]?.updatedAt || null,
+        trainingSessionUpdatedAt: v2.trainingByDate?.[date]?.updatedAt || null,
+        trainingItemsUpdatedAtMax: v2.trainingByDate?.[date]?.itemsUpdatedAtMax || null,
+      };
+      const condScore = v2.conditionsByDate?.[date]?.score ?? null;
+      const nowIso = new Date().toISOString();
+      setV2(prev => {
+        const next = { ...prev };
+        next.trainingByDate = { ...(prev.trainingByDate || {}) };
+        next.trainingByDate[date] = {
+          note: "",
+          updatedAt: nowIso,
+          items: { main: [], sub: [] },
+          itemsUpdatedAtMax: nowIso,
+        };
+        return next;
+      });
       try {
         await putRemoteDayV2({
           userId: syncUserId,
           password: syncPassword,
           date,
-          conditionScore: v2.conditionsByDate?.[date]?.score ?? null,
+          conditionScore: condScore,
           note: "",
           items: [],
-          clientLast: {
-            conditionsUpdatedAt: v2.conditionsByDate?.[date]?.updatedAt || null,
-            trainingSessionUpdatedAt: v2.trainingByDate?.[date]?.updatedAt || null,
-            trainingItemsUpdatedAtMax: v2.trainingByDate?.[date]?.itemsUpdatedAtMax || null,
-          },
+          clientLast,
         });
         setSyncErr(null);
-        setV2(prev => {
-          const next = { ...prev };
-          next.trainingByDate = { ...(prev.trainingByDate || {}) };
-          next.trainingByDate[date] = {
-            note: "",
-            updatedAt: new Date().toISOString(),
-            items: { main: [], sub: [] },
-            itemsUpdatedAtMax: new Date().toISOString(),
-          };
-          return next;
-        });
       } catch (e) {
         const msg = e?.code === 409 ? "サーバー側が先に更新されています。再同期しました。" : (e?.message || "sync failed");
         setSyncErr(msg);
-        if (e?.code === 409) {
-          try { await refetchRemoteV2(); } catch (_) {}
-        }
+        try { await refetchRemoteV2(); } catch (_) {}
       }
       setTab("training");
       return;
@@ -241,6 +242,34 @@ export default function App() {
     const note = typeof log.note === "string" ? log.note : "";
     const items = formRowsToV2Items(log.mainRows, log.subRows);
 
+    const clientLast = {
+      conditionsUpdatedAt: v2.conditionsByDate?.[date]?.updatedAt || null,
+      trainingSessionUpdatedAt: v2.trainingByDate?.[date]?.updatedAt || null,
+      trainingItemsUpdatedAtMax: v2.trainingByDate?.[date]?.itemsUpdatedAtMax || null,
+    };
+    const nowIso = new Date().toISOString();
+    setV2(prev => {
+      const next = { ...prev };
+      next.conditionsByDate = { ...(prev.conditionsByDate || {}) };
+      next.trainingByDate = { ...(prev.trainingByDate || {}) };
+      const prevCondNote = prev.conditionsByDate?.[date]?.note ?? "";
+      next.conditionsByDate[date] = {
+        score: conditionScore,
+        note: prevCondNote,
+        updatedAt: nowIso,
+      };
+
+      const mainItems = items.filter(it => it.category === "main").map(it => ({ ...it, id: `local_${date}_m_${it.sortOrder}` }));
+      const subItems = items.filter(it => it.category === "sub").map(it => ({ ...it, id: `local_${date}_s_${it.sortOrder}` }));
+      next.trainingByDate[date] = {
+        note,
+        updatedAt: nowIso,
+        items: { main: mainItems, sub: subItems },
+        itemsUpdatedAtMax: nowIso,
+      };
+      return next;
+    });
+
     try {
       await putRemoteDayV2({
         userId: syncUserId,
@@ -249,74 +278,52 @@ export default function App() {
         conditionScore,
         note,
         items,
-        clientLast: {
-          conditionsUpdatedAt: v2.conditionsByDate?.[date]?.updatedAt || null,
-          trainingSessionUpdatedAt: v2.trainingByDate?.[date]?.updatedAt || null,
-          trainingItemsUpdatedAtMax: v2.trainingByDate?.[date]?.itemsUpdatedAtMax || null,
-        },
+        clientLast,
       });
       setSyncErr(null);
-      setV2(prev => {
-        const next = { ...prev };
-        next.conditionsByDate = { ...(prev.conditionsByDate || {}) };
-        next.trainingByDate = { ...(prev.trainingByDate || {}) };
-        next.conditionsByDate[date] = { score: conditionScore, updatedAt: new Date().toISOString() };
-
-        const mainItems = items.filter(it => it.category === "main").map(it => ({ ...it, id: `local_${date}_m_${it.sortOrder}` }));
-        const subItems = items.filter(it => it.category === "sub").map(it => ({ ...it, id: `local_${date}_s_${it.sortOrder}` }));
-        next.trainingByDate[date] = {
-          note,
-          updatedAt: new Date().toISOString(),
-          items: { main: mainItems, sub: subItems },
-          itemsUpdatedAtMax: new Date().toISOString(),
-        };
-        return next;
-      });
     } catch (e) {
       const msg = e?.code === 409 ? "サーバー側が先に更新されています。再同期しました。" : (e?.message || "sync failed");
       setSyncErr(msg);
-      if (e?.code === 409) {
-        try { await refetchRemoteV2(); } catch (_) {}
-      }
+      try { await refetchRemoteV2(); } catch (_) {}
     }
 
     setTab("training");
   }, [v2, refetchRemoteV2, syncUserId, syncPassword]);
 
-  const updateCondition = useCallback(async (date, value) => {
-    const conditionScore = asNullableScore(value);
-    const note = v2.trainingByDate?.[date]?.note || "";
-    const items = [
-      ...(v2.trainingByDate?.[date]?.items?.main || []).map(it => ({ ...it, category: "main" })),
-      ...(v2.trainingByDate?.[date]?.items?.sub || []).map(it => ({ ...it, category: "sub" })),
-    ];
+  const saveConditionDay = useCallback(async ({ date, conditionScore, conditionNote }) => {
+    const score = asNullableScore(conditionScore);
+    const cn = typeof conditionNote === "string" ? conditionNote : "";
+    const clientLast = {
+      conditionsUpdatedAt: v2.conditionsByDate?.[date]?.updatedAt || null,
+      trainingSessionUpdatedAt: v2.trainingByDate?.[date]?.updatedAt || null,
+      trainingItemsUpdatedAtMax: v2.trainingByDate?.[date]?.itemsUpdatedAtMax || null,
+    };
+    const nowIso = new Date().toISOString();
+    setV2(prev => {
+      const next = { ...prev };
+      next.conditionsByDate = { ...(prev.conditionsByDate || {}) };
+      next.conditionsByDate[date] = {
+        score,
+        note: cn,
+        updatedAt: nowIso,
+      };
+      return next;
+    });
+
     try {
       await putRemoteDayV2({
         userId: syncUserId,
         password: syncPassword,
         date,
-        conditionScore,
-        note,
-        items,
-        clientLast: {
-          conditionsUpdatedAt: v2.conditionsByDate?.[date]?.updatedAt || null,
-          trainingSessionUpdatedAt: v2.trainingByDate?.[date]?.updatedAt || null,
-          trainingItemsUpdatedAtMax: v2.trainingByDate?.[date]?.itemsUpdatedAtMax || null,
-        },
+        conditionScore: score,
+        conditionNote: cn,
+        clientLast,
       });
       setSyncErr(null);
-      setV2(prev => {
-        const next = { ...prev };
-        next.conditionsByDate = { ...(prev.conditionsByDate || {}) };
-        next.conditionsByDate[date] = { score: conditionScore, updatedAt: new Date().toISOString() };
-        return next;
-      });
     } catch (e) {
       const msg = e?.code === 409 ? "サーバー側が先に更新されています。再同期しました。" : (e?.message || "sync failed");
       setSyncErr(msg);
-      if (e?.code === 409) {
-        try { await refetchRemoteV2(); } catch (_) {}
-      }
+      try { await refetchRemoteV2(); } catch (_) {}
     }
   }, [v2, refetchRemoteV2, syncUserId, syncPassword]);
 
@@ -375,6 +382,7 @@ export default function App() {
             password: syncPassword,
             date: day.date,
             conditionScore: day.conditionScore === undefined ? null : day.conditionScore,
+            conditionNote: typeof day.conditionNote === "string" ? day.conditionNote : "",
             note: typeof day.note === "string" ? day.note : "",
             items,
             clientLast: null,
@@ -512,7 +520,6 @@ export default function App() {
             v2={v2}
             daySummaries={daySummaries}
             todayISO={todayISO}
-            condColor={condColor}
             condLabel={condLabel}
             DateHeader={DateHeader}
             OSBar={OSBar}
@@ -524,8 +531,11 @@ export default function App() {
           <ConditionTabPage
             key="cond"
             v2={v2}
-            onUpdateCondition={updateCondition}
+            onSaveConditionDay={saveConditionDay}
+            todayISO={todayISO}
+            fmtDate={fmtDate}
             ConditionChartCard={ConditionChartCard}
+            ConditionRecordScreen={ConditionRecordScreen}
           />
         )}
         {tab === "training" && (

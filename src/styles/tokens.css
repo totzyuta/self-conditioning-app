@@ -3,4 +3,10 @@
   --green: #2D5A27; --green-dim: #EAF2E9;
   --terra: #C4613A; --terra-dim: #FBF0EB;
   --text: #1C1C1A; --muted: #9B9890; --border: #E4E1D8;
+  /* condColor: 5.0=中立、低→クール(#5A6470)、高→ウォーム(#9D5E4E)。condLabel() 帯は下記の離散色 */
+  --cond-band-very-low: #5A6470;
+  --cond-band-low: #5D6E88;
+  --cond-band-neutral: #6F7B68;
+  --cond-band-high: #A77752;
+  --cond-band-very-high: #9D5E4E;
 }

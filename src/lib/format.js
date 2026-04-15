@@ -4,26 +4,71 @@ export function asNullableScore(value) {
   return Number.isFinite(n) ? n : null;
 }
 
-export function condColor(v) {
-  if (v == null) return "#9B9890";
-  if (v >= 7.5) return "#1F4A1A";
-  if (v >= 6.5) return "#2D5A27";
-  if (v >= 5.5) return "#4A8A44";
-  if (v >= 5.0) return "#7CB877";
-  if (v >= 4.0) return "#9B9890";
-  if (v >= 3.0) return "#C48A6A";
-  return "#C4613A";
+function _parseHex(hex) {
+  const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(String(hex || "").trim());
+  if (!m) return null;
+  return { r: parseInt(m[1], 16), g: parseInt(m[2], 16), b: parseInt(m[3], 16) };
 }
 
+function _mixHex(hexA, hexB, t) {
+  const A = _parseHex(hexA);
+  const B = _parseHex(hexB);
+  if (!A || !B) return hexA;
+  const u = Math.max(0, Math.min(1, t));
+  const r = Math.round(A.r + (B.r - A.r) * u);
+  const g = Math.round(A.g + (B.g - A.g) * u);
+  const bl = Math.round(A.b + (B.b - A.b) * u);
+  const h = (n) => Math.max(0, Math.min(255, n)).toString(16).padStart(2, "0");
+  return `#${h(r)}${h(g)}${h(bl)}`;
+}
+
+/**
+ * スコア 0–10 の表示色（数値・スライダー・Orb・チャート線など）。
+ * 5.0 を中立（--muted 相当）とし、低いほどクール、高いほどウォームへ連続変化。
+ * 「高い＝良い」ではなく、両端はニュートラルからの偏りとして色分けする設計。
+ */
+export function condColor(v) {
+  if (v == null) return "#9B9890";
+  const n = Number(v);
+  if (!Number.isFinite(n)) return "#9B9890";
+  const x = Math.max(0, Math.min(10, n));
+  const coolEnd = "#5A6470";
+  const neutral = "#9B9890";
+  const warmEnd = "#9D5E4E";
+  if (x <= 5) {
+    return _mixHex(coolEnd, neutral, x / 5);
+  }
+  return _mixHex(neutral, warmEnd, (x - 5) / 5);
+}
+
+/**
+ * 0–10 スコアの帯ラベル（5.0 がニュートラル軸）。
+ * 端は "Too low/high" ではなく Very low/high（価値判断を弱めた自己観察向けの語感）。
+ *
+ * 閾値: [0,3) [3,4.5) [4.5,5.5] (5.5,7] (7,10]
+ */
 export function condLabel(v) {
   if (v == null) return "—";
-  if (v >= 7.5) return "Excellent";
-  if (v >= 6.5) return "Very Good";
-  if (v >= 5.5) return "Good";
-  if (v >= 5.0) return "Above Neutral";
-  if (v >= 4.5) return "Neutral";
-  if (v >= 3.5) return "Below Neutral";
-  return "Low";
+  if (v < 3) return "Very low";
+  if (v < 4.5) return "Low";
+  if (v <= 5.5) return "Neutral";
+  if (v <= 7) return "High";
+  return "Very high";
+}
+
+/**
+ * Tier color for condLabel() text only (Very low … Very high).
+ * Discrete steps; same cool/warm story as condColor (not merit-based).
+ */
+export function condLabelColor(v) {
+  if (v == null) return "#9B9890";
+  const n = Number(v);
+  if (!Number.isFinite(n)) return "#9B9890";
+  if (n < 3) return "#5A6470";
+  if (n < 4.5) return "#5D6E88";
+  if (n <= 5.5) return "#6F7B68";
+  if (n <= 7) return "#A77752";
+  return "#9D5E4E";
 }
 
 const WD_JA = ["日", "月", "火", "水", "木", "金", "土"];

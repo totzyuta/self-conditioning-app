@@ -12,7 +12,11 @@ export function buildV2StateFromRemote(remote) {
   next.userId = remote.userId || "";
   (remote.conditions || []).forEach(r => {
     if (!r?.date) return;
-    next.conditionsByDate[r.date] = { score: r.score ?? null, updatedAt: r.updated_at || null };
+    next.conditionsByDate[r.date] = {
+      score: r.score ?? null,
+      note: r.note != null ? String(r.note) : "",
+      updatedAt: r.updated_at || null,
+    };
   });
   (remote.trainingSessions || []).forEach(r => {
     if (!r?.date) return;
@@ -64,6 +68,7 @@ export function daySummariesFromV2(v2) {
   Object.keys(v2.trainingByDate || {}).forEach(d => dates.add(d));
   return Array.from(dates).sort().map(date => {
     const score = v2.conditionsByDate?.[date]?.score ?? null;
+    const conditionNote = v2.conditionsByDate?.[date]?.note ?? "";
     const tr = v2.trainingByDate?.[date];
     const main = (tr?.items?.main || []).map(it => ({
       exerciseName: String(it.exerciseName || "").trim(),
@@ -82,6 +87,7 @@ export function daySummariesFromV2(v2) {
       id: `v2_${date}`,
       date,
       condition: score,
+      conditionNote,
       type,
       note: tr?.note || "",
       main,

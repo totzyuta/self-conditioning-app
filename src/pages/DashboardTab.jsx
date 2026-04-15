@@ -1,10 +1,10 @@
 import React, { useMemo } from "react";
+import { condLabelColor } from "../lib/format.js";
 
 export default function DashboardTab({
   v2,
   daySummaries,
   todayISO,
-  condColor,
   condLabel,
   DateHeader,
   OSBar,
@@ -15,7 +15,8 @@ export default function DashboardTab({
   const summaries = daySummaries || [];
 
   const todayCond = v2.conditionsByDate?.[today]?.score;
-  const c = condColor(todayCond != null ? todayCond : null);
+  const todayCondNote = (v2.conditionsByDate?.[today]?.note || "").trim();
+  const bandLabelColor = todayCond != null ? condLabelColor(Number(todayCond)) : "#9B9890";
 
   const recentSessions = useMemo(() => {
     const sorted = [...summaries].sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -38,7 +39,7 @@ export default function DashboardTab({
           Condition
         </div>
         <div style={{
-          fontSize: 104, fontWeight: 100, color: c,
+          fontSize: 104, fontWeight: 100, color: "var(--green)",
           lineHeight: 1, letterSpacing: "-7px",
           fontVariantNumeric: "tabular-nums",
           animation: "countUp .6s .3s cubic-bezier(.22,1,.36,1) both",
@@ -47,7 +48,7 @@ export default function DashboardTab({
         </div>
         <div style={{ marginTop: 10, animation: "fadeUp .4s .5s both" }}>
           {todayCond != null ? (
-            <span style={{ fontSize: 12, color: c }}>{condLabel(Number(todayCond))}</span>
+            <span style={{ fontSize: 12, color: bandLabelColor }}>{condLabel(Number(todayCond))}</span>
           ) : (
             <span style={{ fontSize: 11, color: "var(--muted)" }}>本日の記録なし</span>
           )}
@@ -63,6 +64,24 @@ export default function DashboardTab({
       <div style={{ animation: "fadeUp .45s .7s both" }}>
         <ConditionChartCard v2={v2} defaultPeriod="1m" height={110} />
       </div>
+
+      {todayCondNote.length > 0 && (
+        <div style={{
+          background: "var(--surface)", border: "1px solid var(--border)",
+          borderRadius: 10, padding: "14px 18px", marginTop: 16,
+          animation: "fadeUp .45s .75s both",
+        }}>
+          <div style={{ fontSize: 9, letterSpacing: ".28em", color: "var(--muted)", textTransform: "uppercase", marginBottom: 8 }}>
+            Condition memo
+          </div>
+          <div style={{
+            fontSize: 11, color: "#555", lineHeight: 1.65,
+            display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden",
+          }}>
+            {todayCondNote}
+          </div>
+        </div>
+      )}
 
       {recentSessions.length > 0 && (
         <div style={{
