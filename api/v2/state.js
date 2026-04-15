@@ -30,6 +30,19 @@ function asIsoDate(s) {
   return t;
 }
 
+/** True when Postgres/PostgREST reports missing conditions.note (migration not applied yet). */
+function isMissingConditionsNoteError(err) {
+  const m = String(err?.message || "").toLowerCase();
+  if (!m.includes("note")) return false;
+  const aboutConditions = m.includes("conditions");
+  const missing =
+    m.includes("does not exist") ||
+    m.includes("could not find") ||
+    m.includes("unknown column") ||
+    m.includes("schema cache");
+  return aboutConditions && missing;
+}
+
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET,PUT,DELETE,OPTIONS");
@@ -71,8 +84,15 @@ export default async function handler(req, res) {
         return out;
       };
 
-      const [conds, sessions, items] = await Promise.all([
-        rangeFilter(supabase.from("conditions").select("date, score, note, updated_at")),
+      let conds = await rangeFilter(supabase.from("conditions").select("date, score, note, updated_at"));
+      if (conds.error && isMissingConditionsNoteError(conds.error)) {
+        conds = await rangeFilter(supabase.from("conditions").select("date, score, updated_at"));
+        if (!conds.error && conds.data) {
+          conds = { ...conds, data: conds.data.map((r) => ({ ...r, note: "" })) };
+        }
+      }
+
+      const [sessions, items] = await Promise.all([
         rangeFilter(supabase.from("training_sessions").select("date, note, updated_at")),
         rangeFilter(supabase.from("training_items").select("id, date, category, exercise_name, weight, reps, sets, sort_order, updated_at").order("date", { ascending: true }).order("sort_order", { ascending: true })),
       ]);
@@ -140,17 +160,25 @@ export default async function handler(req, res) {
       }
 
       if (conditionScore !== undefined || conditionNote !== undefined) {
-        const ex = await supabase
+        let ex = await supabase
           .from("conditions")
           .select("score, note")
           .eq("user_id", userId)
           .eq("date", date)
           .maybeSingle();
+        if (ex.error && isMissingConditionsNoteError(ex.error)) {
+          ex = await supabase
+            .from("conditions")
+            .select("score")
+            .eq("user_id", userId)
+            .eq("date", date)
+            .maybeSingle();
+        }
         if (ex.error) return json(res, 500, { ok: false, error: ex.error.message });
         const prev = ex.data || null;
         const mergedScore = conditionScore !== undefined ? conditionScore : (prev?.score ?? null);
         const mergedNote = conditionNote !== undefined ? conditionNote : String(prev?.note ?? "");
-        const up = await supabase
+        let up = await supabase
           .from("conditions")
           .upsert(
             { user_id: userId, date, score: mergedScore, note: mergedNote },
@@ -158,6 +186,16 @@ export default async function handler(req, res) {
           )
           .select("updated_at")
           .single();
+        if (up.error && isMissingConditionsNoteError(up.error)) {
+          up = await supabase
+            .from("conditions")
+            .upsert(
+              { user_id: userId, date, score: mergedScore },
+              { onConflict: "user_id,date" },
+            )
+            .select("updated_at")
+            .single();
+        }
         if (up.error) return json(res, 500, { ok: false, error: up.error.message });
       }
 
