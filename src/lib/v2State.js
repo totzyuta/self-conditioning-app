@@ -3,6 +3,8 @@ export function emptyV2State(userId = "") {
     userId,
     conditionsByDate: {},
     trainingByDate: {},
+    stepsByDate: {},
+    weightByDate: {},
   };
 }
 
@@ -58,6 +60,25 @@ export function buildV2StateFromRemote(remote) {
     t.items.main.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
     t.items.sub.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
   });
+
+  (remote.steps || []).forEach(r => {
+    if (!r?.date) return;
+    next.stepsByDate[r.date] = {
+      steps: r.steps ?? null,
+      note: r.note != null ? String(r.note) : "",
+      updatedAt: r.updated_at || null,
+    };
+  });
+
+  (remote.weights || []).forEach(r => {
+    if (!r?.date) return;
+    next.weightByDate[r.date] = {
+      weight: r.weight ?? null,
+      note: r.note != null ? String(r.note) : "",
+      updatedAt: r.updated_at || null,
+    };
+  });
+
   return next;
 }
 

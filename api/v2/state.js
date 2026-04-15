@@ -68,6 +68,10 @@ export default async function handler(req, res) {
       if (delItems.error) return json(res, 500, { ok: false, error: delItems.error.message });
       const delSessions = await supabase.from("training_sessions").delete().eq("user_id", userId);
       if (delSessions.error) return json(res, 500, { ok: false, error: delSessions.error.message });
+        const delSteps = await supabase.from("steps").delete().eq("user_id", userId);
+        if (delSteps.error) return json(res, 500, { ok: false, error: delSteps.error.message });
+        const delWeights = await supabase.from("weights").delete().eq("user_id", userId);
+        if (delWeights.error) return json(res, 500, { ok: false, error: delWeights.error.message });
       const delConds = await supabase.from("conditions").delete().eq("user_id", userId);
       if (delConds.error) return json(res, 500, { ok: false, error: delConds.error.message });
       return json(res, 200, { ok: true, userId, wiped: true });
@@ -92,14 +96,18 @@ export default async function handler(req, res) {
         }
       }
 
-      const [sessions, items] = await Promise.all([
+      const [sessions, items, steps, weights] = await Promise.all([
         rangeFilter(supabase.from("training_sessions").select("date, note, updated_at")),
         rangeFilter(supabase.from("training_items").select("id, date, category, exercise_name, weight, reps, sets, sort_order, updated_at").order("date", { ascending: true }).order("sort_order", { ascending: true })),
+        rangeFilter(supabase.from("steps").select("date, steps, note, updated_at")),
+        rangeFilter(supabase.from("weights").select("date, weight, note, updated_at")),
       ]);
 
       if (conds.error) return json(res, 500, { ok: false, error: conds.error.message });
       if (sessions.error) return json(res, 500, { ok: false, error: sessions.error.message });
       if (items.error) return json(res, 500, { ok: false, error: items.error.message });
+      if (steps.error) return json(res, 500, { ok: false, error: steps.error.message });
+      if (weights.error) return json(res, 500, { ok: false, error: weights.error.message });
 
       return json(res, 200, {
         ok: true,
@@ -107,6 +115,8 @@ export default async function handler(req, res) {
         conditions: conds.data || [],
         trainingSessions: sessions.data || [],
         trainingItems: items.data || [],
+        steps: steps.data || [],
+        weights: weights.data || [],
       });
     }
 
@@ -124,23 +134,43 @@ export default async function handler(req, res) {
         const n = Number(body.conditionScore);
         if (Number.isFinite(n)) conditionScore = n;
       }
+      let steps;
+      if (body.steps === null) steps = null;
+      else if (typeof body.steps === "number" && Number.isFinite(body.steps)) steps = Math.trunc(body.steps);
+      else if (typeof body.steps === "string" && body.steps.trim() !== "") {
+        const n = Number(body.steps);
+        if (Number.isFinite(n)) steps = Math.trunc(n);
+      }
+      let weight;
+      if (body.weight === null) weight = null;
+      else if (typeof body.weight === "number" && Number.isFinite(body.weight)) weight = body.weight;
+      else if (typeof body.weight === "string" && body.weight.trim() !== "") {
+        const n = Number(body.weight);
+        if (Number.isFinite(n)) weight = n;
+      }
       const note = typeof body.note === "string" ? body.note : undefined;
       const conditionNote = typeof body.conditionNote === "string" ? body.conditionNote : undefined;
+      const stepsNote = typeof body.stepsNote === "string" ? body.stepsNote : undefined;
+      const weightNote = typeof body.weightNote === "string" ? body.weightNote : undefined;
       const items = Array.isArray(body.items) ? body.items : undefined;
 
       // Optional optimistic concurrency: client can send last known timestamps for this date.
-      const clientLast = body.clientLast || null; // { conditionsUpdatedAt, trainingSessionUpdatedAt, trainingItemsUpdatedAtMax }
+      const clientLast = body.clientLast || null; // { conditionsUpdatedAt, trainingSessionUpdatedAt, trainingItemsUpdatedAtMax, stepsUpdatedAt, weightsUpdatedAt }
 
       if (clientLast) {
         const checks = await Promise.all([
           supabase.from("conditions").select("updated_at").eq("user_id", userId).eq("date", date).maybeSingle(),
           supabase.from("training_sessions").select("updated_at").eq("user_id", userId).eq("date", date).maybeSingle(),
           supabase.from("training_items").select("updated_at").eq("user_id", userId).eq("date", date).order("updated_at", { ascending: false }).limit(1),
+          supabase.from("steps").select("updated_at").eq("user_id", userId).eq("date", date).maybeSingle(),
+          supabase.from("weights").select("updated_at").eq("user_id", userId).eq("date", date).maybeSingle(),
         ]);
-        const [c0, s0, i0] = checks;
+        const [c0, s0, i0, st0, w0] = checks;
         if (c0.error) return json(res, 500, { ok: false, error: c0.error.message });
         if (s0.error) return json(res, 500, { ok: false, error: s0.error.message });
         if (i0.error) return json(res, 500, { ok: false, error: i0.error.message });
+        if (st0.error) return json(res, 500, { ok: false, error: st0.error.message });
+        if (w0.error) return json(res, 500, { ok: false, error: w0.error.message });
 
         const newer = (serverIso, clientIso) => {
           if (!serverIso || !clientIso) return false;
@@ -153,7 +183,9 @@ export default async function handler(req, res) {
         if (
           newer(c0.data?.updated_at, clientLast.conditionsUpdatedAt) ||
           newer(s0.data?.updated_at, clientLast.trainingSessionUpdatedAt) ||
-          newer(serverItemsMax, clientLast.trainingItemsUpdatedAtMax)
+          newer(serverItemsMax, clientLast.trainingItemsUpdatedAtMax) ||
+          newer(st0.data?.updated_at, clientLast.stepsUpdatedAt) ||
+          newer(w0.data?.updated_at, clientLast.weightsUpdatedAt)
         ) {
           return json(res, 409, { ok: false, conflict: true, error: "Conflict" });
         }
@@ -203,6 +235,44 @@ export default async function handler(req, res) {
         const up = await supabase
           .from("training_sessions")
           .upsert({ user_id: userId, date, note }, { onConflict: "user_id,date" })
+          .select("updated_at")
+          .single();
+        if (up.error) return json(res, 500, { ok: false, error: up.error.message });
+      }
+
+      if (steps !== undefined || stepsNote !== undefined) {
+        const ex = await supabase
+          .from("steps")
+          .select("steps, note")
+          .eq("user_id", userId)
+          .eq("date", date)
+          .maybeSingle();
+        if (ex.error) return json(res, 500, { ok: false, error: ex.error.message });
+        const prev = ex.data || null;
+        const mergedSteps = steps !== undefined ? steps : (prev?.steps ?? null);
+        const mergedNote = stepsNote !== undefined ? stepsNote : String(prev?.note ?? "");
+        const up = await supabase
+          .from("steps")
+          .upsert({ user_id: userId, date, steps: mergedSteps, note: mergedNote }, { onConflict: "user_id,date" })
+          .select("updated_at")
+          .single();
+        if (up.error) return json(res, 500, { ok: false, error: up.error.message });
+      }
+
+      if (weight !== undefined || weightNote !== undefined) {
+        const ex = await supabase
+          .from("weights")
+          .select("weight, note")
+          .eq("user_id", userId)
+          .eq("date", date)
+          .maybeSingle();
+        if (ex.error) return json(res, 500, { ok: false, error: ex.error.message });
+        const prev = ex.data || null;
+        const mergedWeight = weight !== undefined ? weight : (prev?.weight ?? null);
+        const mergedNote = weightNote !== undefined ? weightNote : String(prev?.note ?? "");
+        const up = await supabase
+          .from("weights")
+          .upsert({ user_id: userId, date, weight: mergedWeight, note: mergedNote }, { onConflict: "user_id,date" })
           .select("updated_at")
           .single();
         if (up.error) return json(res, 500, { ok: false, error: up.error.message });
