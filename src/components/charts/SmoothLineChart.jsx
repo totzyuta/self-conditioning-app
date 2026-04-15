@@ -157,11 +157,17 @@ export default function SmoothLineChart({
       ref={svgRef}
       width="100%" viewBox={`0 0 ${w} ${h}`}
       preserveAspectRatio="xMidYMid meet"
-      style={{ display: "block", overflow: "visible", cursor: "crosshair" }}
+      style={{
+        display: "block",
+        overflow: "visible",
+        cursor: "crosshair",
+        // Avoid preventDefault on touchmove (passive listeners); still block scroll-steal on chart scrub
+        touchAction: "none",
+      }}
       onMouseMove={handlePointer}
       onMouseLeave={() => setHovered(null)}
       onTouchStart={handlePointer}
-      onTouchMove={e => { e.preventDefault(); handlePointer(e); }}
+      onTouchMove={handlePointer}
       onTouchEnd={() => setHovered(null)}
     >
       {yLabels.map(v => (
