@@ -57,12 +57,14 @@ export const V2_SEED_DAYS = [
   {
     date: "2026-03-11",
     conditionScore: 4.5,
+    conditionNote: "睡眠は6h前後。起床時の重さはまだ残る。",
     note: "ニュートラル（5.0）まであと一息。翌日3/12からの本格再開に向けてOSを安定させる。",
     items: [{ category: "main", exerciseName: "休息", weight: "—", reps: "—", sortOrder: 0 }],
   },
   {
     date: "2026-03-12",
     conditionScore: 4.8,
+    conditionNote: "ジム復帰初日。メンタルは上向き。",
     note: "かなり久しぶりのトレーニング。やっとやっと、回復して来た気がする。ベンチプレスで、かなり回復。\nテンポ 3s",
     items: [
       { category: "main", exerciseName: "BP (ベンチプレス)", weight: "40kg", reps: "(10,10,9)", sortOrder: 0 },

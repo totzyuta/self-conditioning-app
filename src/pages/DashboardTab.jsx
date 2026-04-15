@@ -15,6 +15,7 @@ export default function DashboardTab({
   const summaries = daySummaries || [];
 
   const todayCond = v2.conditionsByDate?.[today]?.score;
+  const todayCondNote = (v2.conditionsByDate?.[today]?.note || "").trim();
   const c = condColor(todayCond != null ? todayCond : null);
 
   const recentSessions = useMemo(() => {
@@ -63,6 +64,24 @@ export default function DashboardTab({
       <div style={{ animation: "fadeUp .45s .7s both" }}>
         <ConditionChartCard v2={v2} defaultPeriod="1m" height={110} />
       </div>
+
+      {todayCondNote.length > 0 && (
+        <div style={{
+          background: "var(--surface)", border: "1px solid var(--border)",
+          borderRadius: 10, padding: "14px 18px", marginTop: 16,
+          animation: "fadeUp .45s .75s both",
+        }}>
+          <div style={{ fontSize: 9, letterSpacing: ".28em", color: "var(--muted)", textTransform: "uppercase", marginBottom: 8 }}>
+            Condition memo
+          </div>
+          <div style={{
+            fontSize: 11, color: "#555", lineHeight: 1.65,
+            display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden",
+          }}>
+            {todayCondNote}
+          </div>
+        </div>
+      )}
 
       {recentSessions.length > 0 && (
         <div style={{
