@@ -17,3 +17,6 @@
 
 ### 4. 出力の最適化
 - 成功時の挨拶や、過度な礼儀表現は不要。技術的な正確性と簡潔さを最優先する。
+
+### 5. Git / PR
+- Git・Pull Request・本番 `main` の扱いは `AGENTS.md` および `.cursor/rules/git-pr-workflow.mdc` に従うこと。
