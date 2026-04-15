@@ -1,4 +1,7 @@
 {
+  "rewrites": [
+    { "source": "/favicon.ico", "destination": "/favicon.svg" }
+  ],
   "devCommand": "npm run dev:vite",
   "buildCommand": "vite build",
   "outputDirectory": "dist",

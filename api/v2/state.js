@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { checkSyncAuth } from "../lib/syncAuth.js";
 
 function json(res, status, body) {
   res.statusCode = status;
@@ -17,12 +18,10 @@ function getSupabase() {
   return createClient(url, key, { auth: { persistSession: false } });
 }
 
-function checkAuth(req) {
-  const expected = process.env.SYNC_PASSWORD;
-  if (!expected) return { ok: false, status: 500, message: "Missing SYNC_PASSWORD" };
-  const got = req.headers["x-sync-password"];
-  if (!got || got !== expected) return { ok: false, status: 401, message: "Unauthorized" };
-  return { ok: true };
+/** FK: conditions / training_* reference public.users(id). Ensure row exists (idempotent). */
+async function ensurePublicUser(supabase, userId) {
+  const { error } = await supabase.from("users").upsert({ id: userId }, { onConflict: "id" });
+  return error;
 }
 
 function asIsoDate(s) {
@@ -41,12 +40,15 @@ export default async function handler(req, res) {
     return res.end();
   }
 
-  const auth = checkAuth(req);
+  const auth = checkSyncAuth(req);
   if (!auth.ok) return json(res, auth.status, { ok: false, error: auth.message });
 
   try {
     const supabase = getSupabase();
-    const userId = (req.query?.user_id || "user_default").toString();
+    const userId = auth.userId;
+
+    const userErr = await ensurePublicUser(supabase, userId);
+    if (userErr) return json(res, 500, { ok: false, error: userErr.message });
 
     if (req.method === "DELETE") {
       const delItems = await supabase.from("training_items").delete().eq("user_id", userId);
@@ -95,7 +97,13 @@ export default async function handler(req, res) {
       const date = asIsoDate(body.date);
       if (!date) return json(res, 400, { ok: false, error: "Invalid body: date (YYYY-MM-DD) required" });
 
-      const conditionScore = (typeof body.conditionScore === "number" || body.conditionScore === null) ? body.conditionScore : undefined;
+      let conditionScore;
+      if (body.conditionScore === null) conditionScore = null;
+      else if (typeof body.conditionScore === "number" && Number.isFinite(body.conditionScore)) conditionScore = body.conditionScore;
+      else if (typeof body.conditionScore === "string" && body.conditionScore.trim() !== "") {
+        const n = Number(body.conditionScore);
+        if (Number.isFinite(n)) conditionScore = n;
+      }
       const note = typeof body.note === "string" ? body.note : undefined;
       const items = Array.isArray(body.items) ? body.items : undefined;
 
