@@ -4,133 +4,26 @@ import DashboardTab from "./pages/DashboardTab.jsx";
 import ConditionTabPage from "./pages/ConditionTab.jsx";
 import TrainingTabPage from "./pages/TrainingTab.jsx";
 import { V2_SEED_DAYS } from "./seed/v2Seed.js";
-
-/* ═══ App Version ═══════════════════════════════════════  */
-const APP_VERSION = "2.0.0";
-
-/* ═══ Storage (per logical user_id) ═══════════════════════ */
-const SESSION_KEY = "phl_sync_session_v2";
-
-function storageSk2(uid) {
-  return `phl_tracker_v2__${uid}`;
-}
-
-/** ログインで許可する組み合わせ（API の ALLOWED_SYNC_USERS と一致させる） */
-const LOGIN_ALLOWED = [
-  { userId: "totzyu", password: "totzyu0424" },
-  { userId: "totzyu_dev", password: "totzyu0424" },
-];
-
-function safeJsonParse(s) {
-  try { return JSON.parse(s); } catch { return null; }
-}
-
-function readSession() {
-  try {
-    const raw = localStorage.getItem(SESSION_KEY);
-    const p = safeJsonParse(raw);
-    if (!p || typeof p.exp !== "number" || !p.userId || typeof p.password !== "string") return null;
-    if (p.exp <= Date.now()) return null;
-    return p;
-  } catch {
-    return null;
-  }
-}
-
-function writeSession(userId, password) {
-  const exp = Date.now() + 30 * 24 * 60 * 60 * 1000;
-  try {
-    localStorage.setItem(SESSION_KEY, JSON.stringify({ userId, password, exp }));
-  } catch {}
-}
-
-function defaultLoginUserId() {
-  try {
-    const h = String(window.location?.hostname || "").toLowerCase();
-    if (h === "localhost" || h === "127.0.0.1" || h === "::1" || h === "[::1]") return "totzyu_dev";
-  } catch {}
-  return "totzyu";
-}
-
-
-
-function loadLocalV2(userId) {
-  if (!userId) return { state: null, updatedAtMs: 0 };
-  const raw = localStorage.getItem(storageSk2(userId));
-  if (!raw) return { state: null, updatedAtMs: 0 };
-  const parsed = safeJsonParse(raw);
-  if (!parsed || typeof parsed !== "object") return { state: null, updatedAtMs: 0 };
-  const updatedAtMs = typeof parsed.updatedAtMs === "number" ? parsed.updatedAtMs : 0;
-  const state = parsed.state && typeof parsed.state === "object" ? parsed.state : null;
-  return { state, updatedAtMs };
-}
-
-function saveLocalV2(userId, state, updatedAtMs = Date.now()) {
-  if (!userId) return;
-  try { localStorage.setItem(storageSk2(userId), JSON.stringify({ state, updatedAtMs })); } catch {}
-}
-
-
-
-function asNullableScore(value) {
-  if (value == null) return null;
-  const n = Number(value);
-  return Number.isFinite(n) ? n : null;
-}
-
-
-
-async function fetchRemoteStateV2(userId, password) {
-  const res = await fetch(`/api/v2/state?user_id=${encodeURIComponent(userId)}`, {
-    headers: { "x-sync-password": password },
-  });
-  const data = await res.json().catch(() => null);
-  if (!res.ok || !data?.ok) throw new Error(data?.error || `HTTP ${res.status}`);
-  return data;
-}
-
-async function putRemoteDayV2({
-  userId,
-  password,
-  date,
-  conditionScore,
-  note,
-  items,
-  clientLast,
-}) {
-  const res = await fetch(`/api/v2/state?user_id=${encodeURIComponent(userId)}`, {
-    method: "PUT",
-    headers: {
-      "Content-Type": "application/json",
-      "x-sync-password": password,
-    },
-    body: JSON.stringify({ date, conditionScore, note, items, clientLast }),
-  });
-  const data = await res.json().catch(() => null);
-  if (!res.ok || !data?.ok) {
-    const err = new Error(data?.error || `HTTP ${res.status}`);
-    err.code = res.status;
-    err.data = data;
-    throw err;
-  }
-  return data;
-}
-
-async function wipeRemoteStateV2(userId, password) {
-  const res = await fetch(`/api/v2/state?user_id=${encodeURIComponent(userId)}`, {
-    method: "DELETE",
-    headers: { "x-sync-password": password },
-  });
-  const data = await res.json().catch(() => null);
-  if (!res.ok || !data?.ok) {
-    const err = new Error(data?.error || `HTTP ${res.status}`);
-    err.code = res.status;
-    err.data = data;
-    throw err;
-  }
-  return data;
-}
-
+import { APP_VERSION, LOGIN_ALLOWED, TABS } from "./lib/constants.js";
+import { SESSION_KEY, readSession, writeSession, defaultLoginUserId } from "./lib/session.js";
+import { storageSk2, loadLocalV2, saveLocalV2 } from "./lib/storageV2.js";
+import { fetchRemoteStateV2, putRemoteDayV2, wipeRemoteStateV2 } from "./lib/apiV2.js";
+import {
+  emptyV2State,
+  buildV2StateFromRemote,
+  daySummariesFromV2,
+  v2ItemsToFormRows,
+  formRowsToV2Items,
+} from "./lib/v2State.js";
+import {
+  asNullableScore,
+  condColor,
+  condLabel,
+  fmtDate,
+  todayISO,
+  formatRepsForDisplay,
+  formatExerciseLine,
+} from "./lib/format.js";
 
 /* ═══ Password Gate ═════════════════════════════════════ */
 function PasswordGate({ onAuth }) {
@@ -275,194 +168,6 @@ function PasswordGate({ onAuth }) {
       </div>
     </div>
   );
-}
-
-function emptyV2State(userId = "") {
-  return {
-    userId,
-    conditionsByDate: {}, // { [date]: { score, updatedAt } }
-    trainingByDate: {}, // { [date]: { note, updatedAt, items: { main:[], sub:[] }, itemsUpdatedAtMax } }
-  };
-}
-
-/** GET /api/v2/state のレスポンスをクライアント v2 状態に変換 */
-function buildV2StateFromRemote(remote) {
-  const next = emptyV2State(remote.userId || "");
-  next.userId = remote.userId || "";
-  (remote.conditions || []).forEach(r => {
-    if (!r?.date) return;
-    next.conditionsByDate[r.date] = { score: r.score ?? null, updatedAt: r.updated_at || null };
-  });
-  (remote.trainingSessions || []).forEach(r => {
-    if (!r?.date) return;
-    next.trainingByDate[r.date] = {
-      note: r.note || "",
-      updatedAt: r.updated_at || null,
-      items: { main: [], sub: [] },
-      itemsUpdatedAtMax: null,
-    };
-  });
-  (remote.trainingItems || []).forEach(r => {
-    if (!r?.date) return;
-    const slot = next.trainingByDate[r.date] || {
-      note: "",
-      updatedAt: null,
-      items: { main: [], sub: [] },
-      itemsUpdatedAtMax: null,
-    };
-    const cat = r.category === "sub" ? "sub" : "main";
-    slot.items[cat].push({
-      id: r.id,
-      category: cat,
-      exerciseName: r.exercise_name || "",
-      weight: r.weight || "",
-      reps: r.reps || "",
-      sets: r.sets ?? null,
-      sortOrder: r.sort_order ?? 0,
-      updatedAt: r.updated_at || null,
-    });
-    if (r.updated_at) {
-      slot.itemsUpdatedAtMax = !slot.itemsUpdatedAtMax || Date.parse(r.updated_at) > Date.parse(slot.itemsUpdatedAtMax)
-        ? r.updated_at
-        : slot.itemsUpdatedAtMax;
-    }
-    next.trainingByDate[r.date] = slot;
-  });
-  Object.keys(next.trainingByDate).forEach(d => {
-    const t = next.trainingByDate[d];
-    t.items.main.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
-    t.items.sub.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
-  });
-  return next;
-}
-
-/** UI 用: V2 正規化データから日付一覧（文字列パースなし） */
-function daySummariesFromV2(v2) {
-  const dates = new Set();
-  Object.keys(v2.conditionsByDate || {}).forEach(d => dates.add(d));
-  Object.keys(v2.trainingByDate || {}).forEach(d => dates.add(d));
-  return Array.from(dates).sort().map(date => {
-    const score = v2.conditionsByDate?.[date]?.score ?? null;
-    const tr = v2.trainingByDate?.[date];
-    const main = (tr?.items?.main || []).map(it => ({
-      exerciseName: String(it.exerciseName || "").trim(),
-      weight: String(it.weight || "").trim(),
-      reps: String(it.reps || "").trim(),
-    }));
-    const sub = (tr?.items?.sub || []).map(it => ({
-      exerciseName: String(it.exerciseName || "").trim(),
-      weight: String(it.weight || "").trim(),
-      reps: String(it.reps || "").trim(),
-    }));
-    const hasNote = !!(tr?.note && String(tr.note).trim());
-    const hasItems = main.length > 0 || sub.length > 0;
-    const type = (hasItems || hasNote) ? "training" : "rest";
-    return {
-      id: `v2_${date}`,
-      date,
-      condition: score,
-      type,
-      note: tr?.note || "",
-      main,
-      sub,
-    };
-  });
-}
-
-function formatRepsForDisplay(reps) {
-  const r = String(reps || "").trim();
-  if (!r || r === "—") return "";
-  return r.startsWith("(") && r.endsWith(")") ? r : `(${r})`;
-}
-
-function formatExerciseLine(it) {
-  const parts = [String(it.exerciseName || "").trim()].filter(Boolean);
-  const w = String(it.weight || "").trim();
-  if (w && w !== "—") parts.push(w);
-  const rep = formatRepsForDisplay(it.reps);
-  if (rep) parts.push(rep);
-  return parts.join(" ") || "—";
-}
-
-function v2ItemsToFormRows(items) {
-  const rows = (items || [])
-    .map(it => ({
-      name: String(it.exerciseName || "").trim(),
-      weight: String(it.weight || "").trim(),
-      reps: String(it.reps || "").trim(),
-    }))
-    .filter(r => r.name || r.weight || r.reps);
-  return rows.length ? rows : [{ name: "", weight: "", reps: "" }];
-}
-
-function formRowsToV2Items(mainRows, subRows) {
-  const main = (mainRows || [])
-    .filter(r => String(r.name || "").trim())
-    .map((r, idx) => ({
-      category: "main",
-      exerciseName: String(r.name || "").trim(),
-      weight: String(r.weight || "").trim(),
-      reps: String(r.reps || "").trim(),
-      sets: null,
-      sortOrder: idx,
-    }));
-  const sub = (subRows || [])
-    .filter(r => String(r.name || "").trim())
-    .map((r, idx) => ({
-      category: "sub",
-      exerciseName: String(r.name || "").trim(),
-      weight: String(r.weight || "").trim(),
-      reps: String(r.reps || "").trim(),
-      sets: null,
-      sortOrder: idx,
-    }));
-  return [...main, ...sub];
-}
-
-/* ═══ Color helpers ══════════════════════════════════════ */
-function condColor(v) {
-  if (v == null) return "#9B9890";
-  if (v >= 7.5) return "#1F4A1A";
-  if (v >= 6.5) return "#2D5A27";
-  if (v >= 5.5) return "#4A8A44";
-  if (v >= 5.0) return "#7CB877";
-  if (v >= 4.0) return "#9B9890";
-  if (v >= 3.0) return "#C48A6A";
-  return "#C4613A";
-}
-function condLabel(v) {
-  if (v == null) return "—";
-  if (v >= 7.5) return "Excellent";
-  if (v >= 6.5) return "Very Good";
-  if (v >= 5.5) return "Good";
-  if (v >= 5.0) return "Above Neutral";
-  if (v >= 4.5) return "Neutral";
-  if (v >= 3.5) return "Below Neutral";
-  return "Low";
-}
-
-/* ═══ Date helpers ═══════════════════════════════════════ */
-const WD_JA = ["日","月","火","水","木","金","土"];
-const WD_EN = ["SUN","MON","TUE","WED","THU","FRI","SAT"];
-const MO_JA = ["1月","2月","3月","4月","5月","6月","7月","8月","9月","10月","11月","12月"];
-
-function fmtDate(ds) {
-  const d = new Date(ds + "T00:00:00");
-  return {
-    day: d.getDate(),
-    month: MO_JA[d.getMonth()],
-    year: d.getFullYear(),
-    wdJA: WD_JA[d.getDay()],
-    wdEN: WD_EN[d.getDay()],
-    short: `${d.getMonth()+1}/${d.getDate()}`,
-    full: `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日`,
-    ts: d.getTime(),
-  };
-}
-
-function todayISO() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
 
 /* ═══ Smooth SVG Line Chart ══════════════════════════════ */
@@ -1208,12 +913,6 @@ function AddBtn({ onClick, label }) {
     >{label}</button>
   );
 }
-
-const TABS = [
-  { id: "dashboard",  label: "ダッシュボード" },
-  { id: "condition",  label: "コンディション" },
-  { id: "training",   label: "トレーニング" },
-];
 
 export default function App() {
   const sessionInit = readSession();
