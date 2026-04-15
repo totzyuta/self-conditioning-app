@@ -1,10 +1,4 @@
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-:root {
-  --bg: #F9F8F4; --surface: #FFFFFF;
-  --green: #2D5A27; --green-dim: #EAF2E9;
-  --terra: #C4613A; --terra-dim: #FBF0EB;
-  --text: #1C1C1A; --muted: #9B9890; --border: #E4E1D8;
-}
 html, body {
   overflow-x: hidden;
   width: 100%;
@@ -50,33 +44,4 @@ td { padding: 12px 12px; font-size: 12px; border-bottom: 1px solid var(--border)
 tr:last-child td { border-bottom: none; }
 tbody tr { transition: background .15s; }
 tbody tr:hover td { background: rgba(45,90,39,.025); }
-@keyframes fadeUp   { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
-@keyframes fadeDown { from{opacity:0;transform:translateY(-8px)}  to{opacity:1;transform:translateY(0)} }
-@keyframes fadeIn   { from{opacity:0} to{opacity:1} }
-@keyframes countUp  { from{opacity:0;transform:scale(.88) translateY(6px)} to{opacity:1;transform:scale(1) translateY(0)} }
-@keyframes rowIn    { from{opacity:0;transform:translateX(-5px)} to{opacity:1;transform:translateX(0)} }
-@keyframes slideRight { from{opacity:0;transform:translateX(10px)} to{opacity:1;transform:translateX(0)} }
-.fade-up     { animation: fadeUp   .45s cubic-bezier(.22,1,.36,1) both; }
-.fade-down   { animation: fadeDown .4s  cubic-bezier(.22,1,.36,1) both; }
-.fade-in     { animation: fadeIn   .4s  ease both; }
-.count-up    { animation: countUp  .6s  cubic-bezier(.22,1,.36,1) both; }
 button { cursor: pointer; font-family: inherit; }
-@keyframes shakeX {
-  0%,100%{transform:translateX(0)}
-  20%{transform:translateX(-8px)}
-  40%{transform:translateX(8px)}
-  60%{transform:translateX(-5px)}
-  80%{transform:translateX(5px)}
-}
-.shake { animation: shakeX .38s ease; }
-@keyframes syncSpin {
-  to { transform: rotate(360deg); }
-}
-.sync-overlay-spinner {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  border: 3px solid rgba(45, 90, 39, 0.2);
-  border-top-color: var(--green);
-  animation: syncSpin 0.75s linear infinite;
-}
