@@ -1,5 +1,5 @@
 import React from "react";
-import { condColor, condLabel } from "../../lib/format.js";
+import { condColor } from "../../lib/format.js";
 
 export default function OSBar({ value }) {
   const pct = (value / 10) * 100;
@@ -33,11 +33,10 @@ export default function OSBar({ value }) {
           transition: "left .7s cubic-bezier(.34,1.56,.64,1)",
         }} />
       </div>
-      <div style={{ marginTop: 10, textAlign: "center", fontSize: 10, color: "var(--muted)", letterSpacing: "0.07em" }}>
-        OS DELTA:{" "}
-        <span style={{ color: c, fontWeight: 700 }}>{diff >= 0 ? "+" : ""}{diff.toFixed(1)}</span>
-        <span style={{ margin: "0 8px", opacity: .4 }}>·</span>
-        <span style={{ color: c }}>{condLabel(value)}</span>
+      <div style={{ marginTop: 10, textAlign: "center", fontSize: 11, letterSpacing: "0.02em" }}>
+        <span style={{ color: c, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
+          {diff >= 0 ? "+" : ""}{diff.toFixed(1)}
+        </span>
       </div>
     </div>
   );
