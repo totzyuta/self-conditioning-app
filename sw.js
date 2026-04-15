@@ -1,4 +1,4 @@
-const CACHE_NAME = 'self-conditioning-v1-cache';
+const CACHE_NAME = 'self-conditioning-v2-cache';
 const CACHE_VERSION = '1.0.0';
 const ASSETS_TO_CACHE = [
   '/',
