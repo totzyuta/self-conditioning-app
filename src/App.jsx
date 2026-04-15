@@ -335,11 +335,7 @@ export default function App() {
     const st = steps === undefined ? undefined : (steps === null ? null : Math.trunc(Number(steps)));
     const sn = typeof stepsNote === "string" ? stepsNote : "";
     const clientLast = {
-      conditionsUpdatedAt: v2.conditionsByDate?.[date]?.updatedAt || null,
-      trainingSessionUpdatedAt: v2.trainingByDate?.[date]?.updatedAt || null,
-      trainingItemsUpdatedAtMax: v2.trainingByDate?.[date]?.itemsUpdatedAtMax || null,
       stepsUpdatedAt: v2.stepsByDate?.[date]?.updatedAt || null,
-      weightsUpdatedAt: v2.weightByDate?.[date]?.updatedAt || null,
     };
     const nowIso = new Date().toISOString();
     setV2(prev => {
@@ -374,10 +370,6 @@ export default function App() {
     const w = weight === undefined ? undefined : (weight === null ? null : Number(weight));
     const wn = typeof weightNote === "string" ? weightNote : "";
     const clientLast = {
-      conditionsUpdatedAt: v2.conditionsByDate?.[date]?.updatedAt || null,
-      trainingSessionUpdatedAt: v2.trainingByDate?.[date]?.updatedAt || null,
-      trainingItemsUpdatedAtMax: v2.trainingByDate?.[date]?.itemsUpdatedAtMax || null,
-      stepsUpdatedAt: v2.stepsByDate?.[date]?.updatedAt || null,
       weightsUpdatedAt: v2.weightByDate?.[date]?.updatedAt || null,
     };
     const nowIso = new Date().toISOString();
