@@ -4,15 +4,23 @@
 
 ## エントリ
 
-- `index.html` → `src/main.jsx`（グローバル CSS）→ `src/App.jsx`
+- `index.html` → `src/main.jsx`（`src/styles/index.css` を import）→ `src/App.jsx`
 
 ## 主要ディレクトリ
 
 | パス | 役割 |
 |------|------|
+| `src/lib/` | 純関数・API クライアント・セッション・V2 状態ヘルパ（React 非依存） |
+| `src/components/auth/` | `PasswordGate` |
+| `src/components/charts/` | `SmoothLineChart` |
+| `src/components/condition/` | コンディション UI（チャートカード、オーブ、ミニカード等） |
+| `src/components/training/` | `TrainingRecordScreen` |
+| `src/components/layout/` | ヘッダー+タブ、設定シート、フッター、更新バナー |
+| `src/components/ui/` | 小さな共通 UI（`AddBtn`） |
+| `src/hooks/` | `useIsMobile`, `useElementWidth` |
 | `src/pages/` | タブ画面（ダッシュボード / コンディション / トレーニング） |
+| `src/styles/` | `tokens.css` / `base.css` / `animations.css` を `index.css` で束ねる |
 | `src/seed/` | localhost 用シードデータ |
-| `src/styles/` | グローバル CSS |
 | `api/v2/state.js` | Vercel Serverless：V2 同期（GET/PUT/DELETE） |
 | `api/lib/syncAuth.js` | `SYNC_PASSWORD` + `ALLOWED_SYNC_USERS` + `user_id` クエリ |
 | `supabase/` | DB スキーマ・ユーザー seed |
@@ -20,11 +28,9 @@
 
 ## 認証
 
-- **画面:** `App.jsx` 内 `LOGIN_ALLOWED`（`PasswordGate`）。本番の許可ユーザーは **サーバー環境変数 `ALLOWED_SYNC_USERS`** と揃える。
+- **画面:** `src/lib/constants.js` の `LOGIN_ALLOWED` と `components/auth/PasswordGate.jsx`。本番の許可ユーザーは **サーバー環境変数 `ALLOWED_SYNC_USERS`** と揃える。
 - **API:** ヘッダ `x-sync-password`（`SYNC_PASSWORD`）とクエリ `user_id` が一致する必要がある。
 
 ## 同期の向き
 
 - ログイン後、`/api/v2/state` GET でリモートを取り込み、日単位の更新は PUT。競合時は 409 と `refetch` パターン。
-
-モジュール化の詳細な分割案は、作業用ブランチのプラン（Cursor プラン）を参照。

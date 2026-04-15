@@ -1,25 +1,11 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { formatExerciseLine, formatRepsForDisplay } from "../lib/format.js";
 
 const FILTERS = [
   { key: "all", label: "全て" },
   { key: "training", label: "トレーニング" },
   { key: "rest", label: "休息" },
 ];
-
-function formatRepsForDisplay(reps) {
-  const r = String(reps || "").trim();
-  if (!r || r === "—") return "";
-  return r.startsWith("(") && r.endsWith(")") ? r : `(${r})`;
-}
-
-function formatExerciseLine(it) {
-  const parts = [String(it.exerciseName || "").trim()].filter(Boolean);
-  const w = String(it.weight || "").trim();
-  if (w && w !== "—") parts.push(w);
-  const rep = formatRepsForDisplay(it.reps);
-  if (rep) parts.push(rep);
-  return parts.join(" ") || "—";
-}
 
 export default function TrainingTab({
   v2,

@@ -4,7 +4,7 @@ import DashboardTab from "./pages/DashboardTab.jsx";
 import ConditionTabPage from "./pages/ConditionTab.jsx";
 import TrainingTabPage from "./pages/TrainingTab.jsx";
 import { V2_SEED_DAYS } from "./seed/v2Seed.js";
-import { APP_VERSION, TABS } from "./lib/constants.js";
+import { APP_VERSION } from "./lib/constants.js";
 import { SESSION_KEY, readSession } from "./lib/session.js";
 import { storageSk2, loadLocalV2, saveLocalV2 } from "./lib/storageV2.js";
 import { fetchRemoteStateV2, putRemoteDayV2, wipeRemoteStateV2 } from "./lib/apiV2.js";
@@ -28,6 +28,11 @@ import CondOrb from "./components/condition/CondOrb.jsx";
 import OSBar from "./components/condition/OSBar.jsx";
 import SessionMiniCard from "./components/condition/SessionMiniCard.jsx";
 import TrainingRecordScreen from "./components/training/TrainingRecordScreen.jsx";
+import AppHeaderTabs from "./components/layout/AppHeaderTabs.jsx";
+import SettingsSheet from "./components/layout/SettingsSheet.jsx";
+import UpdateAvailableBar from "./components/layout/UpdateAvailableBar.jsx";
+import AppFooterMark from "./components/layout/AppFooterMark.jsx";
+
 export default function App() {
   const sessionInit = readSession();
   const [authed, setAuthed] = useState(() => !!sessionInit);
@@ -493,81 +498,12 @@ export default function App() {
         </div>
       )}
 
-      <header style={{
-        padding: "20px 24px 0",
-        borderBottom: "1px solid var(--border)",
-        position: "sticky", top: 0,
-        background: "var(--bg)", zIndex: 10,
-      }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-          <div style={{ flex: 1, textAlign: "center" }}>
-            <div style={{ fontSize: 9, letterSpacing: ".28em", color: "var(--muted)", textTransform: "uppercase", marginBottom: 3 }}>
-              PERSONAL HEALTH LOG
-            </div>
-            <h1 style={{ fontSize: 17, fontWeight: 300, color: "var(--green)", letterSpacing: ".01em" }}>
-              Self Conditioning App
-            </h1>
-          </div>
-
-          <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
-            <div style={{
-              width: 30, height: 30, borderRadius: "50%",
-              background: "var(--green-dim)", border: "1.5px solid var(--green)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 12, fontWeight: 700, color: "var(--green)",
-              letterSpacing: "0",
-            }}>T</div>
-            <div>
-              <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text)", letterSpacing: ".01em" }}>@{syncUserId || "—"}</div>
-              <div style={{ fontSize: 9, color: "var(--muted)", letterSpacing: ".06em", marginTop: 1 }}>ACTIVE</div>
-            </div>
-
-            <button
-              onClick={() => setShowSettings(!showSettings)}
-              style={{
-                background: "none", border: "none", padding: "6px",
-                cursor: "pointer", display: "flex", alignItems: "center",
-                justifyContent: "center", color: "var(--muted)",
-                transition: "color .2s", width: 32, height: 32,
-                marginLeft: 4,
-              }}
-              onMouseEnter={(e) => e.currentTarget.style.color = "var(--green)"}
-              onMouseLeave={(e) => e.currentTarget.style.color = "var(--muted)"}
-              title="設定"
-            >
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="2.5" />
-                <circle cx="12" cy="12" r="8" />
-                <line x1="12" y1="2" x2="12" y2="4" />
-                <line x1="12" y1="20" x2="12" y2="22" />
-                <line x1="2" y1="12" x2="4" y2="12" />
-                <line x1="20" y1="12" x2="22" y2="12" />
-                <line x1="4.93" y1="4.93" x2="6.36" y2="6.36" />
-                <line x1="17.64" y1="17.64" x2="19.07" y2="19.07" />
-                <line x1="19.07" y1="4.93" x2="17.64" y2="6.36" />
-                <line x1="6.36" y1="17.64" x2="4.93" y2="19.07" />
-              </svg>
-            </button>
-          </div>
-        </div>
-
-        <nav style={{ display: "flex", overflow: "hidden" }}>
-          {TABS.map(t => (
-            <button key={t.id} onClick={() => setTab(t.id)} style={{
-              background: "none", border: "none", flex: 1,
-              borderBottom: tab === t.id ? "2.5px solid var(--green)" : "2.5px solid transparent",
-              padding: "8px 4px", fontSize: 11,
-              color: tab === t.id ? "var(--green)" : "var(--muted)",
-              fontWeight: tab === t.id ? 700 : 400,
-              letterSpacing: ".01em", marginBottom: -1,
-              transition: "color .2s,border-color .2s",
-              whiteSpace: "nowrap",
-            }}>
-              {t.label}
-            </button>
-          ))}
-        </nav>
-      </header>
+      <AppHeaderTabs
+        syncUserId={syncUserId}
+        tab={tab}
+        setTab={setTab}
+        onToggleSettings={() => setShowSettings(s => !s)}
+      />
 
       <main>
         {tab === "dashboard" && (
@@ -607,217 +543,31 @@ export default function App() {
       </main>
 
       {showSettings && (
-        <div style={{
-          position: "fixed", inset: 0, zIndex: 999,
-          background: "rgba(0,0,0,.4)", display: "flex",
-          alignItems: "flex-end", justifyContent: "center",
-          animation: "fadeUp .25s ease",
-        }}>
-          <div style={{
-            background: "var(--surface)", borderRadius: "16px 16px 0 0",
-            padding: "28px 24px", maxWidth: "100%", width: "100%",
-            maxHeight: "80vh", overflowY: "auto",
-            borderTop: "1px solid var(--border)",
-          }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-              <h2 style={{ fontSize: 17, fontWeight: 600, letterSpacing: ".02em" }}>設定</h2>
-              <button
-                onClick={() => setShowSettings(false)}
-                style={{
-                  background: "none", border: "none", fontSize: 20,
-                  cursor: "pointer", color: "var(--muted)", padding: "4px 8px",
-                }}
-              >
-                ✕
-              </button>
-            </div>
-
-            <div style={{  gap: 16, display: "flex", flexDirection: "column" }}>
-              <div>
-                <div style={{
-                  fontSize: 11,
-                  color: updateAvailable ? "var(--terra)" : "var(--muted)",
-                  fontWeight: 700,
-                  letterSpacing: ".06em",
-                  marginBottom: 10,
-                }}>
-                  {updateAvailable ? "新しいバージョンが利用可能です" : "すでに最新版です"}
-                </div>
-                <button
-                  onClick={() => {
-                    setShowSettings(false);
-                    handleForceUpdate();
-                  }}
-                  style={{
-                    width: "100%",
-                    padding: "12px",
-                    background: updateAvailable ? "var(--terra)" : "var(--green)",
-                    color: "#fff",
-                    border: "none",
-                    borderRadius: 7,
-                    fontSize: 13,
-                    fontWeight: 600,
-                    letterSpacing: ".06em",
-                    cursor: "pointer",
-                    transition: "opacity .2s",
-                  }}
-                  onMouseEnter={(e) => e.target.style.opacity = "0.85"}
-                  onMouseLeave={(e) => e.target.style.opacity = "1"}
-                >
-                  {updateAvailable ? "アップデートを更新" : "最新版を確認"}
-                </button>
-              </div>
-
-              <div style={{ paddingTop: 16, borderTop: "1px solid var(--border)" }}>
-                <div style={{ fontSize: 11, color: "var(--muted)", letterSpacing: ".06em", marginBottom: 10 }}>
-                  データ
-                </div>
-                <button
-                  onClick={saveLocalBackupNow}
-                  style={{
-                    width: "100%",
-                    padding: "12px",
-                    marginBottom: 10,
-                    background: "none",
-                    color: "var(--muted)",
-                    border: "1px solid var(--border)",
-                    borderRadius: 7,
-                    fontSize: 12,
-                    fontWeight: 700,
-                    letterSpacing: ".04em",
-                    cursor: "pointer",
-                  }}
-                >
-                  ローカルにバックアップを保存
-                </button>
-                <button
-                  onClick={restoreLatestLocalBackup}
-                  style={{
-                    width: "100%",
-                    padding: "12px",
-                    background: "none",
-                    color: "var(--muted)",
-                    border: "1px solid var(--border)",
-                    borderRadius: 7,
-                    fontSize: 12,
-                    fontWeight: 700,
-                    letterSpacing: ".04em",
-                    cursor: "pointer",
-                  }}
-                >
-                  最新バックアップから復元
-                </button>
-                <div style={{ marginTop: 10, fontSize: 11, color: "var(--muted)", lineHeight: 1.5, textAlign: "center" }}>
-                  最新バックアップ: {isLocalhost
-                    ? (latestLocalBackup ? new Date(latestLocalBackup.ts).toLocaleString() : "なし")
-                    : (latestRemoteBackup ? new Date(latestRemoteBackup.ts).toLocaleString() : "なし")}
-                </div>
-
-                {isLocalhost && (
-                  <>
-                    <button
-                      onClick={setSeedData}
-                      style={{
-                        width: "100%",
-                        padding: "12px",
-                        marginTop: 12,
-                        background: "none",
-                        color: "var(--muted)",
-                        border: "1px solid var(--border)",
-                        borderRadius: 7,
-                        fontSize: 12,
-                        fontWeight: 700,
-                        letterSpacing: ".04em",
-                        cursor: "pointer",
-                      }}
-                    >
-                      シードデータにリセット
-                    </button>
-
-                    <button
-                      onClick={deleteAllData}
-                      style={{
-                        width: "100%",
-                        padding: "12px",
-                        marginTop: 10,
-                        background: "none",
-                        color: "var(--terra)",
-                        border: "1px solid var(--terra)",
-                        borderRadius: 7,
-                        fontSize: 12,
-                        fontWeight: 800,
-                        letterSpacing: ".04em",
-                        cursor: "pointer",
-                      }}
-                    >
-                      データを全て削除する
-                    </button>
-                  </>
-                )}
-              </div>
-
-              <div style={{ paddingTop: 16, borderTop: "1px solid var(--border)" }}>
-                <div style={{ fontSize: 11, color: "var(--muted)", letterSpacing: ".06em", marginBottom: 10 }}>
-                  アカウント
-                </div>
-                <button
-                  type="button"
-                  onClick={handleLogout}
-                  style={{
-                    width: "100%",
-                    padding: "12px",
-                    background: "none",
-                    color: "var(--text)",
-                    border: "1px solid var(--border)",
-                    borderRadius: 7,
-                    fontSize: 12,
-                    fontWeight: 700,
-                    letterSpacing: ".04em",
-                    cursor: "pointer",
-                  }}
-                >
-                  ログアウト
-                </button>
-              </div>
-
-              <div style={{ padding: "16px 0", borderTop: "1px solid var(--border)" }}>
-                <div style={{ fontSize: 11, color: "var(--muted)", letterSpacing: ".06em", marginBottom: 8 }}>
-                  アプリバージョン
-                </div>
-                <div style={{ fontSize: 14, fontWeight: 500, fontVariantNumeric: "tabular-nums" }}>
-                  {APP_VERSION}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <SettingsSheet
+          onClose={() => setShowSettings(false)}
+          updateAvailable={updateAvailable}
+          onConfirmUpdate={() => {
+            setShowSettings(false);
+            handleForceUpdate();
+          }}
+          onBackup={saveLocalBackupNow}
+          onRestore={restoreLatestLocalBackup}
+          latestLocalBackup={latestLocalBackup}
+          latestRemoteBackup={latestRemoteBackup}
+          isLocalhost={isLocalhost}
+          onSeed={setSeedData}
+          onDeleteAll={deleteAllData}
+          onLogout={handleLogout}
+          appVersion={APP_VERSION}
+        />
       )}
 
-      {updateAvailable && !showSettings && (
-        <div style={{
-          position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)",
-          zIndex: 998, padding: "12px 16px", borderRadius: 8,
-          background: "var(--terra)", color: "#fff",
-          fontSize: 12, fontWeight: 600, letterSpacing: ".05em",
-          boxShadow: "0 4px 12px rgba(196,97,58,.3)",
-          animation: "slideUp .3s ease",
-          cursor: "pointer",
-          maxWidth: "90vw",
-        }}
-        onClick={() => setShowSettings(true)}
-        title="設定を開く"
-        >
-          ✓ 新しいバージョンが利用可能 — タップして更新
-        </div>
-      )}
+      <UpdateAvailableBar
+        visible={updateAvailable && !showSettings}
+        onOpenSettings={() => setShowSettings(true)}
+      />
 
-      <footer style={{
-        padding: "24px", textAlign: "center",
-        borderTop: "1px solid var(--border)",
-        fontSize: 9, color: "#D0CDC5", letterSpacing: ".15em",
-      }}>
-        SELF CONDITIONING APP  ·  {APP_VERSION}
-      </footer>
+      <AppFooterMark version={APP_VERSION} />
     </div>
   );
 }
