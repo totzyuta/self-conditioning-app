@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { checkSyncAuth } from "../lib/syncAuth.js";
 
 function json(res, status, body) {
   res.statusCode = status;
@@ -17,14 +18,6 @@ function getSupabase() {
   return createClient(url, key, { auth: { persistSession: false } });
 }
 
-function checkAuth(req) {
-  const expected = process.env.SYNC_PASSWORD;
-  if (!expected) return { ok: false, status: 500, message: "Missing SYNC_PASSWORD" };
-  const got = req.headers["x-sync-password"];
-  if (!got || got !== expected) return { ok: false, status: 401, message: "Unauthorized" };
-  return { ok: true };
-}
-
 function asIsoDate(s) {
   const t = String(s || "").trim();
   if (!/^\d{4}-\d{2}-\d{2}$/.test(t)) return null;
@@ -41,12 +34,12 @@ export default async function handler(req, res) {
     return res.end();
   }
 
-  const auth = checkAuth(req);
+  const auth = checkSyncAuth(req);
   if (!auth.ok) return json(res, auth.status, { ok: false, error: auth.message });
 
   try {
     const supabase = getSupabase();
-    const userId = (req.query?.user_id || "user_default").toString();
+    const userId = auth.userId;
 
     if (req.method === "DELETE") {
       const delItems = await supabase.from("training_items").delete().eq("user_id", userId);

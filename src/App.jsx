@@ -8,24 +8,62 @@ import { V2_SEED_DAYS } from "./seed/v2Seed.js";
 /* ═══ App Version ═══════════════════════════════════════  */
 const APP_VERSION = "v1.1.0";
 
-/* ═══ Storage ═══════════════════════════════════════════ */
-const SK     = "phl_tracker_v1";
-const SK_V2  = "phl_tracker_v2";
-const SCHEMA_VERSION_KEY = "phl_schema_version";
+/* ═══ Storage (per logical user_id) ═══════════════════════ */
+const SESSION_KEY = "phl_sync_session_v2";
 const SCHEMA_VERSION_V2 = 2;
-const USER_ID_DEFAULT = "user_default";
-const AUTH_K = "phl_auth_v1";
-const PW     = "totzyu0424";
+
+function storageSk1(uid) {
+  return `phl_tracker_v1__${uid}`;
+}
+function storageSk2(uid) {
+  return `phl_tracker_v2__${uid}`;
+}
+function storageSchemaKey(uid) {
+  return `phl_schema_version__${uid}`;
+}
+
+/** ログインで許可する組み合わせ（API の ALLOWED_SYNC_USERS と一致させる） */
+const LOGIN_ALLOWED = [
+  { userId: "totzyu", password: "totzyu0424" },
+  { userId: "totzyu_dev", password: "totzyu0424" },
+];
 
 function safeJsonParse(s) {
   try { return JSON.parse(s); } catch { return null; }
 }
 
-function loadLocalLogs() {
-  const raw = localStorage.getItem(SK);
+function readSession() {
+  try {
+    const raw = localStorage.getItem(SESSION_KEY);
+    const p = safeJsonParse(raw);
+    if (!p || typeof p.exp !== "number" || !p.userId || typeof p.password !== "string") return null;
+    if (p.exp <= Date.now()) return null;
+    return p;
+  } catch {
+    return null;
+  }
+}
+
+function writeSession(userId, password) {
+  const exp = Date.now() + 30 * 24 * 60 * 60 * 1000;
+  try {
+    localStorage.setItem(SESSION_KEY, JSON.stringify({ userId, password, exp }));
+  } catch {}
+}
+
+function defaultLoginUserId() {
+  try {
+    const h = String(window.location?.hostname || "").toLowerCase();
+    if (h === "localhost" || h === "127.0.0.1" || h === "::1" || h === "[::1]") return "totzyu_dev";
+  } catch {}
+  return "totzyu";
+}
+
+function loadLocalLogs(userId) {
+  if (!userId) return { logs: null, updatedAtMs: 0 };
+  const raw = localStorage.getItem(storageSk1(userId));
   if (!raw) return { logs: null, updatedAtMs: 0 };
   const parsed = safeJsonParse(raw);
-  // Back-compat: older versions stored logs array directly
   if (Array.isArray(parsed)) return { logs: parsed, updatedAtMs: 0 };
   if (parsed && Array.isArray(parsed.logs)) {
     const updatedAtMs = typeof parsed.updatedAtMs === "number" ? parsed.updatedAtMs : 0;
@@ -34,12 +72,14 @@ function loadLocalLogs() {
   return { logs: null, updatedAtMs: 0 };
 }
 
-function saveLocalLogs(logs, updatedAtMs = Date.now()) {
-  try { localStorage.setItem(SK, JSON.stringify({ logs, updatedAtMs })); } catch {}
+function saveLocalLogs(userId, logs, updatedAtMs = Date.now()) {
+  if (!userId) return;
+  try { localStorage.setItem(storageSk1(userId), JSON.stringify({ logs, updatedAtMs })); } catch {}
 }
 
-function loadLocalV2() {
-  const raw = localStorage.getItem(SK_V2);
+function loadLocalV2(userId) {
+  if (!userId) return { state: null, updatedAtMs: 0 };
+  const raw = localStorage.getItem(storageSk2(userId));
   if (!raw) return { state: null, updatedAtMs: 0 };
   const parsed = safeJsonParse(raw);
   if (!parsed || typeof parsed !== "object") return { state: null, updatedAtMs: 0 };
@@ -48,21 +88,19 @@ function loadLocalV2() {
   return { state, updatedAtMs };
 }
 
-function saveLocalV2(state, updatedAtMs = Date.now()) {
-  try { localStorage.setItem(SK_V2, JSON.stringify({ state, updatedAtMs })); } catch {}
+function saveLocalV2(userId, state, updatedAtMs = Date.now()) {
+  if (!userId) return;
+  try { localStorage.setItem(storageSk2(userId), JSON.stringify({ state, updatedAtMs })); } catch {}
 }
 
-function getSchemaVersion() {
-  try { return parseInt(localStorage.getItem(SCHEMA_VERSION_KEY) || "0", 10) || 0; } catch { return 0; }
+function getSchemaVersion(userId) {
+  if (!userId) return 0;
+  try { return parseInt(localStorage.getItem(storageSchemaKey(userId)) || "0", 10) || 0; } catch { return 0; }
 }
 
-function setSchemaVersion(v) {
-  try { localStorage.setItem(SCHEMA_VERSION_KEY, String(v)); } catch {}
-}
-
-function loadSyncPw() {
-  // This is not secure (client-side), but matches the current "password gate" model.
-  return PW;
+function setSchemaVersion(userId, v) {
+  if (!userId) return;
+  try { localStorage.setItem(storageSchemaKey(userId), String(v)); } catch {}
 }
 
 function asNullableScore(value) {
@@ -71,21 +109,21 @@ function asNullableScore(value) {
   return Number.isFinite(n) ? n : null;
 }
 
-async function fetchRemoteState() {
-  const res = await fetch("/api/state", {
-    headers: { "x-sync-password": loadSyncPw() },
+async function fetchRemoteState(userId, password) {
+  const res = await fetch(`/api/state?user_id=${encodeURIComponent(userId)}`, {
+    headers: { "x-sync-password": password },
   });
   const data = await res.json().catch(() => null);
   if (!res.ok || !data?.ok) throw new Error(data?.error || `HTTP ${res.status}`);
-  return data; // { logs, updatedAt }
+  return data;
 }
 
-async function pushRemoteState(logs, lastUpdatedAtIso) {
-  const res = await fetch("/api/state", {
+async function pushRemoteState(userId, password, logs, lastUpdatedAtIso) {
+  const res = await fetch(`/api/state?user_id=${encodeURIComponent(userId)}`, {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
-      "x-sync-password": loadSyncPw(),
+      "x-sync-password": password,
       ...(lastUpdatedAtIso ? { "x-last-updated-at": lastUpdatedAtIso } : {}),
     },
     body: JSON.stringify({ logs }),
@@ -97,20 +135,21 @@ async function pushRemoteState(logs, lastUpdatedAtIso) {
     err.data = data;
     throw err;
   }
-  return data; // { updatedAt }
+  return data;
 }
 
-async function fetchRemoteStateV2(userId = USER_ID_DEFAULT) {
+async function fetchRemoteStateV2(userId, password) {
   const res = await fetch(`/api/v2/state?user_id=${encodeURIComponent(userId)}`, {
-    headers: { "x-sync-password": loadSyncPw() },
+    headers: { "x-sync-password": password },
   });
   const data = await res.json().catch(() => null);
   if (!res.ok || !data?.ok) throw new Error(data?.error || `HTTP ${res.status}`);
-  return data; // { conditions, trainingSessions, trainingItems }
+  return data;
 }
 
 async function putRemoteDayV2({
-  userId = USER_ID_DEFAULT,
+  userId,
+  password,
   date,
   conditionScore,
   note,
@@ -121,7 +160,7 @@ async function putRemoteDayV2({
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
-      "x-sync-password": loadSyncPw(),
+      "x-sync-password": password,
     },
     body: JSON.stringify({ date, conditionScore, note, items, clientLast }),
   });
@@ -135,10 +174,10 @@ async function putRemoteDayV2({
   return data;
 }
 
-async function wipeRemoteStateV2(userId = USER_ID_DEFAULT) {
+async function wipeRemoteStateV2(userId, password) {
   const res = await fetch(`/api/v2/state?user_id=${encodeURIComponent(userId)}`, {
     method: "DELETE",
-    headers: { "x-sync-password": loadSyncPw() },
+    headers: { "x-sync-password": password },
   });
   const data = await res.json().catch(() => null);
   if (!res.ok || !data?.ok) {
@@ -372,20 +411,20 @@ function normalizeLogsLocalOnly(logs) {
 
 /* ═══ Password Gate ═════════════════════════════════════ */
 function PasswordGate({ onAuth }) {
-  const [val, setVal]     = useState("");
-  const [err, setErr]     = useState(false);
-  const [shake, setShake] = useState(false);
-  const inputRef = useRef(null);
+  const [userIdIn, setUserIdIn] = useState(() => defaultLoginUserId());
+  const [val, setVal]           = useState("");
+  const [err, setErr]           = useState(false);
+  const [shake, setShake]       = useState(false);
+  const passRef = useRef(null);
 
-  useEffect(() => { inputRef.current && inputRef.current.focus(); }, []);
+  useEffect(() => { passRef.current && passRef.current.focus(); }, []);
 
   const attempt = () => {
-    if (val === PW) {
-      try {
-        const exp = Date.now() + 30 * 24 * 60 * 60 * 1000;
-        localStorage.setItem(AUTH_K, String(exp));
-      } catch {}
-      onAuth();
+    const uid = String(userIdIn || "").trim();
+    const ok = LOGIN_ALLOWED.some(x => x.userId === uid && x.password === val);
+    if (ok) {
+      writeSession(uid, val);
+      onAuth({ userId: uid, password: val });
     } else {
       setErr(true);
       setShake(true);
@@ -440,12 +479,34 @@ function PasswordGate({ onAuth }) {
         <div style={{
           fontSize: 10, letterSpacing: ".14em", color: "var(--muted)",
           textTransform: "uppercase", marginBottom: 10,
+        }}>ユーザーID</div>
+        <input
+          type="text"
+          autoComplete="username"
+          value={userIdIn}
+          onChange={e => setUserIdIn(e.target.value)}
+          onKeyDown={handleKey}
+          placeholder="totzyu または totzyu_dev"
+          style={{
+            width: "100%", border: "1px solid var(--border)",
+            background: "var(--surface)",
+            padding: "11px 14px", fontSize: 15, fontFamily: "inherit",
+            color: "var(--text)", borderRadius: 7, outline: "none",
+            marginBottom: 14,
+            letterSpacing: "0.04em",
+          }}
+        />
+
+        <div style={{
+          fontSize: 10, letterSpacing: ".14em", color: "var(--muted)",
+          textTransform: "uppercase", marginBottom: 10,
         }}>パスワード</div>
 
         <div className={shake ? "shake" : ""}>
           <input
-            ref={inputRef}
+            ref={passRef}
             type="password"
+            autoComplete="current-password"
             value={val}
             onChange={e => setVal(e.target.value)}
             onKeyDown={handleKey}
@@ -461,7 +522,7 @@ function PasswordGate({ onAuth }) {
           />
           {err && (
             <div style={{ fontSize: 11, color: "#C4613A", marginTop: 6, letterSpacing: ".03em" }}>
-              パスワードが正しくありません
+              ユーザーIDまたはパスワードが正しくありません
             </div>
           )}
         </div>
@@ -493,9 +554,9 @@ function PasswordGate({ onAuth }) {
   );
 }
 
-function emptyV2State() {
+function emptyV2State(userId = "") {
   return {
-    userId: USER_ID_DEFAULT,
+    userId,
     conditionsByDate: {}, // { [date]: { score, updatedAt } }
     trainingByDate: {}, // { [date]: { note, updatedAt, items: { main:[], sub:[] }, itemsUpdatedAtMax } }
   };
@@ -503,8 +564,8 @@ function emptyV2State() {
 
 /** GET /api/v2/state のレスポンスをクライアント v2 状態に変換 */
 function buildV2StateFromRemote(remote) {
-  const next = emptyV2State();
-  next.userId = remote.userId || USER_ID_DEFAULT;
+  const next = emptyV2State(remote.userId || "");
+  next.userId = remote.userId || "";
   (remote.conditions || []).forEach(r => {
     if (!r?.date) return;
     next.conditionsByDate[r.date] = { score: r.score ?? null, updatedAt: r.updated_at || null };
@@ -1432,19 +1493,19 @@ const TABS = [
 ];
 
 export default function App() {
-  const [authed, setAuthed] = useState(() => {
-    try {
-      const exp = parseInt(localStorage.getItem(AUTH_K) || "0", 10);
-      return exp > Date.now();
-    } catch { return false; }
-  });
+  const sessionInit = readSession();
+  const [authed, setAuthed] = useState(() => !!sessionInit);
+  const [syncUserId, setSyncUserId] = useState(() => sessionInit?.userId ?? null);
+  const [syncPassword, setSyncPassword] = useState(() => sessionInit?.password ?? null);
   const [hiding, setHiding] = useState(false);
   const [v2, setV2] = useState(() => {
+    const s = readSession();
+    if (!s?.userId) return emptyV2State("");
     try {
-      const { state } = loadLocalV2();
+      const { state } = loadLocalV2(s.userId);
       if (state) return state;
     } catch {}
-    return emptyV2State();
+    return emptyV2State(s.userId);
   });
   const daySummaries = useMemo(() => daySummariesFromV2(v2), [v2]);
   const [syncErr, setSyncErr] = useState(null);
@@ -1457,7 +1518,11 @@ export default function App() {
   const swRef = useRef(null);
   const [backupTick, setBackupTick] = useState(0);
   /** v1→v2 移行が終わるまで初回リモート同期を遅らせ、空の GET でローカルを潰さない */
-  const [remoteHydrated, setRemoteHydrated] = useState(() => getSchemaVersion() >= SCHEMA_VERSION_V2);
+  const [remoteHydrated, setRemoteHydrated] = useState(() => {
+    const s = readSession();
+    if (!s?.userId) return false;
+    return getSchemaVersion(s.userId) >= SCHEMA_VERSION_V2;
+  });
   /** 本番ホストではシード／全削除などの危険な操作を UI から隠す */
   const [isLocalhost, setIsLocalhost] = useState(false);
   useEffect(() => {
@@ -1470,39 +1535,50 @@ export default function App() {
       setIsLocalhost(false);
     }
   }, []);
+
+  const sk1 = syncUserId ? storageSk1(syncUserId) : "";
   const latestLocalBackup = useMemo(() => {
+    if (!sk1) return null;
     let latestKey = null;
     let latestTs = -1;
+    const prefix = `${sk1}_backup_`;
     try {
       for (let i = 0; i < localStorage.length; i++) {
         const k = localStorage.key(i);
         if (!k) continue;
-        if (!k.startsWith(`${SK}_backup_`)) continue;
-        const ts = parseInt(k.slice((`${SK}_backup_`).length), 10);
+        if (!k.startsWith(prefix)) continue;
+        const ts = parseInt(k.slice(prefix.length), 10);
         if (!Number.isFinite(ts)) continue;
         if (ts > latestTs) { latestTs = ts; latestKey = k; }
       }
     } catch {}
     return latestKey ? { key: latestKey, ts: latestTs } : null;
-  }, [v2, backupTick]);
+  }, [sk1, v2, backupTick]);
 
   const latestRemoteBackup = useMemo(() => {
+    if (!sk1) return null;
     let latestKey = null;
     let latestTs = -1;
+    const prefix = `${sk1}_remote_backup_`;
     try {
       for (let i = 0; i < localStorage.length; i++) {
         const k = localStorage.key(i);
         if (!k) continue;
-        if (!k.startsWith(`${SK}_remote_backup_`)) continue;
-        const ts = parseInt(k.slice((`${SK}_remote_backup_`).length), 10);
+        if (!k.startsWith(prefix)) continue;
+        const ts = parseInt(k.slice(prefix.length), 10);
         if (!Number.isFinite(ts)) continue;
         if (ts > latestTs) { latestTs = ts; latestKey = k; }
       }
     } catch {}
     return latestKey ? { key: latestKey, ts: latestTs } : null;
-  }, [v2, backupTick]);
+  }, [sk1, v2, backupTick]);
 
-  const handleAuth = () => {
+  const handleGateAuth = ({ userId, password }) => {
+    setSyncUserId(userId);
+    setSyncPassword(password);
+    const { state } = loadLocalV2(userId);
+    setV2(state || emptyV2State(userId));
+    setRemoteHydrated(getSchemaVersion(userId) >= SCHEMA_VERSION_V2);
     setHiding(true);
     setTimeout(() => setAuthed(true), 350);
   };
@@ -1519,8 +1595,8 @@ export default function App() {
 
   // One-time auto migration: legacy logs -> v2 tables/state
   useEffect(() => {
-    if (!authed) return;
-    const v = getSchemaVersion();
+    if (!authed || !syncUserId || !syncPassword) return;
+    const v = getSchemaVersion(syncUserId);
     if (v >= SCHEMA_VERSION_V2) {
       setRemoteHydrated(true);
       return;
@@ -1533,15 +1609,15 @@ export default function App() {
 
         // Backup legacy local logs before migration
         try {
-          const raw = localStorage.getItem(SK);
-          if (raw) localStorage.setItem(`${SK}_backup_${Date.now()}`, raw);
+          const raw = localStorage.getItem(storageSk1(syncUserId));
+          if (raw) localStorage.setItem(`${storageSk1(syncUserId)}_backup_${Date.now()}`, raw);
         } catch {}
 
         // Merge legacy sources (local + server v1) then normalize
-        const { logs: localLogs } = loadLocalLogs();
+        const { logs: localLogs } = loadLocalLogs(syncUserId);
         let merged = Array.isArray(localLogs) ? localLogs : [];
         try {
-          const remoteV1 = await fetchRemoteState();
+          const remoteV1 = await fetchRemoteState(syncUserId, syncPassword);
           if (Array.isArray(remoteV1?.logs)) merged = mergeLogsByDate(merged, remoteV1.logs);
         } catch {}
 
@@ -1577,7 +1653,8 @@ export default function App() {
           ];
 
           await putRemoteDayV2({
-            userId: USER_ID_DEFAULT,
+            userId: syncUserId,
+            password: syncPassword,
             date,
             conditionScore,
             note,
@@ -1587,11 +1664,11 @@ export default function App() {
         }
 
         // Pull fresh v2 snapshot and store locally
-        const remote = await fetchRemoteStateV2(USER_ID_DEFAULT);
+        const remote = await fetchRemoteStateV2(syncUserId, syncPassword);
         if (cancelled) return;
 
         setV2(buildV2StateFromRemote(remote));
-        setSchemaVersion(SCHEMA_VERSION_V2);
+        setSchemaVersion(syncUserId, SCHEMA_VERSION_V2);
       } catch (e) {
         setSyncErr(e?.message || "migration failed");
       } finally {
@@ -1600,24 +1677,26 @@ export default function App() {
     })();
 
     return () => { cancelled = true; };
-  }, [authed]);
+  }, [authed, syncUserId, syncPassword]);
 
   useEffect(() => {
-    saveLocalV2(v2, Date.now());
-  }, [v2]);
+    if (!syncUserId) return;
+    saveLocalV2(syncUserId, v2, Date.now());
+  }, [v2, syncUserId]);
 
   const refetchRemoteV2 = useCallback(async () => {
-    const remote = await fetchRemoteStateV2(USER_ID_DEFAULT);
+    if (!syncUserId || !syncPassword) return;
+    const remote = await fetchRemoteStateV2(syncUserId, syncPassword);
     setV2(buildV2StateFromRemote(remote));
-  }, []);
+  }, [syncUserId, syncPassword]);
 
   useEffect(() => {
-    if (!authed || !remoteHydrated) return;
+    if (!authed || !remoteHydrated || !syncUserId || !syncPassword) return;
     let cancelled = false;
     (async () => {
       setSyncErr(null);
       try {
-        const remote = await fetchRemoteStateV2(USER_ID_DEFAULT);
+        const remote = await fetchRemoteStateV2(syncUserId, syncPassword);
         if (cancelled) return;
         setV2(buildV2StateFromRemote(remote));
       } catch (e) {
@@ -1625,7 +1704,7 @@ export default function App() {
       }
     })();
     return () => { cancelled = true; };
-  }, [authed, remoteHydrated]);
+  }, [authed, remoteHydrated, syncUserId, syncPassword]);
 
   // v2 writes are done per-day by update handlers (no bulk push-on-change here).
 
@@ -1658,7 +1737,8 @@ export default function App() {
     if (log.__delete) {
       try {
         await putRemoteDayV2({
-          userId: USER_ID_DEFAULT,
+          userId: syncUserId,
+          password: syncPassword,
           date,
           conditionScore: v2.conditionsByDate?.[date]?.score ?? null,
           note: "",
@@ -1702,7 +1782,8 @@ export default function App() {
 
     try {
       await putRemoteDayV2({
-        userId: USER_ID_DEFAULT,
+        userId: syncUserId,
+        password: syncPassword,
         date,
         conditionScore,
         note,
@@ -1739,7 +1820,7 @@ export default function App() {
     }
 
     setTab("training");
-  }, [v2, refetchRemoteV2]);
+  }, [v2, refetchRemoteV2, syncUserId, syncPassword]);
 
   const updateCondition = useCallback(async (date, value) => {
     const conditionScore = asNullableScore(value);
@@ -1750,7 +1831,8 @@ export default function App() {
     ];
     try {
       await putRemoteDayV2({
-        userId: USER_ID_DEFAULT,
+        userId: syncUserId,
+        password: syncPassword,
         date,
         conditionScore,
         note,
@@ -1775,7 +1857,7 @@ export default function App() {
         try { await refetchRemoteV2(); } catch (_) {}
       }
     }
-  }, [v2, refetchRemoteV2]);
+  }, [v2, refetchRemoteV2, syncUserId, syncPassword]);
 
   const normalizeLocalData = useCallback(() => {
     window.alert("V2移行後は文字列ベースの正規化は不要になりました。");
@@ -1786,20 +1868,22 @@ export default function App() {
   }, []);
 
   const saveLocalBackupNow = useCallback(() => {
+    if (!syncUserId) return;
     try {
-      const raw = localStorage.getItem(SK);
+      const sk = storageSk1(syncUserId);
+      const raw = localStorage.getItem(sk);
       if (!raw) {
         window.alert("ローカルデータが見つかりませんでした。");
         return;
       }
       const ts = Date.now();
-      localStorage.setItem(`${SK}_backup_${ts}`, raw);
+      localStorage.setItem(`${sk}_backup_${ts}`, raw);
       setBackupTick(t => t + 1);
       window.alert(`バックアップを保存しました: ${new Date(ts).toLocaleString()}`);
     } catch {
       window.alert("バックアップ保存に失敗しました。");
     }
-  }, []);
+  }, [syncUserId]);
 
   const setSeedData = useCallback(() => {
     if (!isLocalhost) {
@@ -1812,17 +1896,17 @@ export default function App() {
     if (!ok) return;
     setShowSettings(false);
     try {
-      const rawV2 = localStorage.getItem(SK_V2);
-      if (rawV2) localStorage.setItem(`${SK_V2}_backup_${Date.now()}`, rawV2);
-      const rawV1 = localStorage.getItem(SK);
-      if (rawV1) localStorage.setItem(`${SK}_backup_${Date.now()}`, rawV1);
+      const rawV2 = localStorage.getItem(storageSk2(syncUserId));
+      if (rawV2) localStorage.setItem(`${storageSk2(syncUserId)}_backup_${Date.now()}`, rawV2);
+      const rawV1 = localStorage.getItem(storageSk1(syncUserId));
+      if (rawV1) localStorage.setItem(`${storageSk1(syncUserId)}_backup_${Date.now()}`, rawV1);
     } catch {}
     (async () => {
       try {
         setSeedResetBlocking(true);
         setSyncErr(null);
 
-        await wipeRemoteStateV2(USER_ID_DEFAULT);
+        await wipeRemoteStateV2(syncUserId, syncPassword);
 
         const days = [...V2_SEED_DAYS].sort((a, b) => String(a.date).localeCompare(String(b.date)));
         for (const day of days) {
@@ -1836,7 +1920,8 @@ export default function App() {
           }));
 
           await putRemoteDayV2({
-            userId: USER_ID_DEFAULT,
+            userId: syncUserId,
+            password: syncPassword,
             date: day.date,
             conditionScore: day.conditionScore === undefined ? null : day.conditionScore,
             note: typeof day.note === "string" ? day.note : "",
@@ -1845,57 +1930,9 @@ export default function App() {
           });
         }
 
-        // Pull snapshot and update local v2 cache
-        const remote = await fetchRemoteStateV2(USER_ID_DEFAULT);
-        const next = emptyV2State();
-        next.userId = remote.userId || USER_ID_DEFAULT;
-        (remote.conditions || []).forEach(r => {
-          if (!r?.date) return;
-          next.conditionsByDate[r.date] = { score: r.score ?? null, updatedAt: r.updated_at || null };
-        });
-        (remote.trainingSessions || []).forEach(r => {
-          if (!r?.date) return;
-          next.trainingByDate[r.date] = {
-            note: r.note || "",
-            updatedAt: r.updated_at || null,
-            items: { main: [], sub: [] },
-            itemsUpdatedAtMax: null,
-          };
-        });
-        (remote.trainingItems || []).forEach(r => {
-          if (!r?.date) return;
-          const slot = next.trainingByDate[r.date] || {
-            note: "",
-            updatedAt: null,
-            items: { main: [], sub: [] },
-            itemsUpdatedAtMax: null,
-          };
-          const cat = r.category === "sub" ? "sub" : "main";
-          slot.items[cat].push({
-            id: r.id,
-            category: cat,
-            exerciseName: r.exercise_name || "",
-            weight: r.weight || "",
-            reps: r.reps || "",
-            sets: r.sets ?? null,
-            sortOrder: r.sort_order ?? 0,
-            updatedAt: r.updated_at || null,
-          });
-          if (r.updated_at) {
-            slot.itemsUpdatedAtMax = !slot.itemsUpdatedAtMax || Date.parse(r.updated_at) > Date.parse(slot.itemsUpdatedAtMax)
-              ? r.updated_at
-              : slot.itemsUpdatedAtMax;
-          }
-          next.trainingByDate[r.date] = slot;
-        });
-        Object.keys(next.trainingByDate).forEach(d => {
-          const t = next.trainingByDate[d];
-          t.items.main.sort((a,b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
-          t.items.sub.sort((a,b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
-        });
-
-        setV2(next);
-        setSchemaVersion(SCHEMA_VERSION_V2);
+        const remote = await fetchRemoteStateV2(syncUserId, syncPassword);
+        setV2(buildV2StateFromRemote(remote));
+        setSchemaVersion(syncUserId, SCHEMA_VERSION_V2);
         setBackupTick(t => t + 1);
         window.alert("シードデータにリセットしました（V2/DB反映）。");
       } catch (e) {
@@ -1904,7 +1941,7 @@ export default function App() {
         setSeedResetBlocking(false);
       }
     })();
-  }, [isLocalhost]);
+  }, [isLocalhost, syncUserId, syncPassword]);
 
   const deleteAllData = useCallback(() => {
     if (!isLocalhost) {
@@ -1914,26 +1951,31 @@ export default function App() {
     const ok = window.confirm("データを全て削除します（ローカルの全ログが空になります）。現在のローカルデータはバックアップを保存してから削除します。実行しますか？");
     if (!ok) return;
     try {
-      const rawV2 = localStorage.getItem(SK_V2);
-      if (rawV2) localStorage.setItem(`${SK_V2}_backup_${Date.now()}`, rawV2);
-      const rawV1 = localStorage.getItem(SK);
-      if (rawV1) localStorage.setItem(`${SK}_backup_${Date.now()}`, rawV1);
+      const rawV2 = localStorage.getItem(storageSk2(syncUserId));
+      if (rawV2) localStorage.setItem(`${storageSk2(syncUserId)}_backup_${Date.now()}`, rawV2);
+      const rawV1 = localStorage.getItem(storageSk1(syncUserId));
+      if (rawV1) localStorage.setItem(`${storageSk1(syncUserId)}_backup_${Date.now()}`, rawV1);
     } catch {}
-    setV2(emptyV2State());
-    setSchemaVersion(SCHEMA_VERSION_V2);
+    setV2(emptyV2State(syncUserId));
+    setSchemaVersion(syncUserId, SCHEMA_VERSION_V2);
+    saveLocalLogs(syncUserId, [], Date.now());
+    saveLocalV2(syncUserId, emptyV2State(syncUserId), Date.now());
     setBackupTick(t => t + 1);
     window.alert("データを全て削除しました（ローカルのみ / V2）。");
-  }, [isLocalhost]);
+  }, [isLocalhost, syncUserId]);
 
   const restoreLatestLocalBackup = useCallback(() => {
+    if (!syncUserId) return;
+    const sk = storageSk1(syncUserId);
+    const prefix = `${sk}_backup_`;
     let latestKey = null;
     let latestTs = -1;
     try {
       for (let i = 0; i < localStorage.length; i++) {
         const k = localStorage.key(i);
         if (!k) continue;
-        if (!k.startsWith(`${SK}_backup_`)) continue;
-        const ts = parseInt(k.slice((`${SK}_backup_`).length), 10);
+        if (!k.startsWith(prefix)) continue;
+        const ts = parseInt(k.slice(prefix.length), 10);
         if (!Number.isFinite(ts)) continue;
         if (ts > latestTs) { latestTs = ts; latestKey = k; }
       }
@@ -1947,17 +1989,14 @@ export default function App() {
     try {
       const raw = localStorage.getItem(latestKey);
       if (!raw) throw new Error("empty");
-      localStorage.setItem(SK, raw);
-      const parsed = safeJsonParse(raw);
-      const nextLogs = Array.isArray(parsed) ? parsed : Array.isArray(parsed?.logs) ? parsed.logs : null;
-      if (!nextLogs) throw new Error("invalid");
-      setLogs(nextLogs);
+      localStorage.setItem(sk, raw);
       setBackupTick(t => t + 1);
-      window.alert("復元しました（ローカルのみ）。");
+      window.alert("復元しました（ローカルのみ）。画面を再読み込みします。");
+      window.setTimeout(() => window.location.reload(), 300);
     } catch {
       window.alert("復元に失敗しました。");
     }
-  }, []);
+  }, [syncUserId]);
 
   return (
     <div style={{ maxWidth: 700, margin: "0 auto", minHeight: "100vh" }}>
@@ -2009,7 +2048,7 @@ export default function App() {
           transition: "opacity .35s ease",
           pointerEvents: hiding ? "none" : "auto",
         }}>
-          <PasswordGate onAuth={handleAuth} />
+          <PasswordGate onAuth={handleGateAuth} />
         </div>
       )}
 
@@ -2038,7 +2077,7 @@ export default function App() {
               letterSpacing: "0",
             }}>T</div>
             <div>
-              <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text)", letterSpacing: ".01em" }}>@totzyu</div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text)", letterSpacing: ".01em" }}>@{syncUserId || "—"}</div>
               <div style={{ fontSize: 9, color: "var(--muted)", letterSpacing: ".06em", marginTop: 1 }}>ACTIVE</div>
             </div>
 

@@ -1,4 +1,4 @@
--- V2 normalized schema (single-user now, multi-user later)
+-- V2 normalized schema (multi logical users via user_id)
 -- Execute in Supabase SQL editor (or via migration tooling).
 -- Assumes Postgres.
 
@@ -11,10 +11,16 @@ create table if not exists public.users (
   created_at timestamptz not null default now()
 );
 
--- Ensure default user exists (safe to re-run)
+-- Logical accounts (sync password + whitelist on API). user_default is legacy only.
 insert into public.users (id)
-values ('user_default')
+values ('totzyu'), ('totzyu_dev')
 on conflict (id) do nothing;
+
+-- Optional one-time: copy legacy rows from user_default into totzyu (run manually if needed)
+-- insert into public.conditions (user_id, date, score, updated_at)
+--   select 'totzyu', date, score, updated_at from public.conditions where user_id = 'user_default'
+--   on conflict (user_id, date) do nothing;
+-- (repeat for training_sessions / training_items as needed)
 
 -- Conditions (1 per day)
 create table if not exists public.conditions (
@@ -78,4 +84,3 @@ drop trigger if exists trg_training_items_updated_at on public.training_items;
 create trigger trg_training_items_updated_at
 before update on public.training_items
 for each row execute procedure public.set_updated_at();
-

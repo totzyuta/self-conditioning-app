@@ -1,6 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
-
-const STATE_ID = process.env.SYNC_STATE_ID || "default";
+import { checkSyncAuth } from "./lib/syncAuth.js";
 
 function json(res, status, body) {
   res.statusCode = status;
@@ -19,14 +18,6 @@ function getSupabase() {
   return createClient(url, key, { auth: { persistSession: false } });
 }
 
-function checkAuth(req) {
-  const expected = process.env.SYNC_PASSWORD;
-  if (!expected) return { ok: false, status: 500, message: "Missing SYNC_PASSWORD" };
-  const got = req.headers["x-sync-password"];
-  if (!got || got !== expected) return { ok: false, status: 401, message: "Unauthorized" };
-  return { ok: true };
-}
-
 export default async function handler(req, res) {
   // same-origin expected, but keep CORS preflight friendly
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -38,8 +29,10 @@ export default async function handler(req, res) {
     return res.end();
   }
 
-  const auth = checkAuth(req);
+  const auth = checkSyncAuth(req);
   if (!auth.ok) return json(res, auth.status, { ok: false, error: auth.message });
+
+  const stateId = auth.userId;
 
   try {
     const supabase = getSupabase();
@@ -48,13 +41,13 @@ export default async function handler(req, res) {
       const { data, error } = await supabase
         .from("app_state")
         .select("logs_json, updated_at")
-        .eq("id", STATE_ID)
+        .eq("id", stateId)
         .single();
       if (error) return json(res, 500, { ok: false, error: error.message });
 
       return json(res, 200, {
         ok: true,
-        id: STATE_ID,
+        id: stateId,
         logs: data?.logs_json ?? [],
         updatedAt: data?.updated_at ?? null,
       });
@@ -72,7 +65,7 @@ export default async function handler(req, res) {
         const { data: cur, error: curErr } = await supabase
           .from("app_state")
           .select("logs_json, updated_at")
-          .eq("id", STATE_ID)
+          .eq("id", stateId)
           .single();
         if (curErr) return json(res, 500, { ok: false, error: curErr.message });
         const serverMs = cur?.updated_at ? Date.parse(cur.updated_at) : 0;
@@ -83,7 +76,7 @@ export default async function handler(req, res) {
             error: "Conflict",
             conflict: true,
             server: {
-              id: STATE_ID,
+              id: stateId,
               logs: cur?.logs_json ?? [],
               updatedAt: cur?.updated_at ?? null,
             },
@@ -94,7 +87,7 @@ export default async function handler(req, res) {
       const nowIso = new Date().toISOString();
       const { data, error } = await supabase
         .from("app_state")
-        .upsert({ id: STATE_ID, logs_json: logs, updated_at: nowIso }, { onConflict: "id" })
+        .upsert({ id: stateId, logs_json: logs, updated_at: nowIso }, { onConflict: "id" })
         .select("updated_at")
         .single();
       if (error) return json(res, 500, { ok: false, error: error.message });
