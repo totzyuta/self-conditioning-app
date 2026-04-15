@@ -1,3 +1,6 @@
+/** コンディション推移グラフの線・塗り（`tokens.css` の --green と同値） */
+export const CONDITION_CHART_LINE_COLOR = "#2D5A27";
+
 export const PERIODS = [
   { key: "1w", label: "1W", days: 7 },
   { key: "1m", label: "1M", days: 30 },

@@ -1,4 +1,5 @@
 import React, { useState, useRef } from "react";
+import { CONDITION_CHART_LINE_COLOR } from "../condition/chartConstants.js";
 
 export default function SmoothLineChart({
   points,
@@ -6,7 +7,7 @@ export default function SmoothLineChart({
   h = 130,
   showNeutral = true,
   showDateLabels = false,
-  color = "#9B9890",
+  color = CONDITION_CHART_LINE_COLOR,
   axisFontSize = 11,
   dateFontSize = 11,
   yMinFixed = 0,

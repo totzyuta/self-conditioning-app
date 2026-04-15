@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import SmoothLineChart from "../charts/SmoothLineChart.jsx";
-import { PERIODS, LABEL_S } from "./chartConstants.js";
+import { CONDITION_CHART_LINE_COLOR, PERIODS, LABEL_S } from "./chartConstants.js";
 import { useIsMobile } from "../../hooks/useIsMobile.js";
 import { useElementWidth } from "../../hooks/useElementWidth.js";
 import { condColor, fmtDate, todayISO } from "../../lib/format.js";
@@ -39,7 +39,6 @@ export default function ConditionChartCard({ v2, defaultPeriod = "1m", height = 
   const avg  = withCond.length ? (withCond.reduce((a,b)=>a+b,0)/withCond.length) : null;
   const maxV = withCond.length ? Math.max(...withCond) : null;
   const minV = withCond.length ? Math.min(...withCond) : null;
-  const chartLineColor = avg != null ? condColor(avg) : "#9B9890";
 
   const existingRow = v2.conditionsByDate?.[date];
   const existingCond = existingRow?.score != null ? Number(existingRow.score) : null;
@@ -90,7 +89,7 @@ export default function ConditionChartCard({ v2, defaultPeriod = "1m", height = 
               points={chartPoints}
               w={chartW}
               h={isMobile ? Math.round(height * 1.5) : height}
-              color={chartLineColor}
+              color={CONDITION_CHART_LINE_COLOR}
               showNeutral={true}
               showDateLabels={true}
               axisFontSize={11}
