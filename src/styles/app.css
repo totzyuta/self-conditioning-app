@@ -69,3 +69,14 @@ button { cursor: pointer; font-family: inherit; }
   80%{transform:translateX(5px)}
 }
 .shake { animation: shakeX .38s ease; }
+@keyframes syncSpin {
+  to { transform: rotate(360deg); }
+}
+.sync-overlay-spinner {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 3px solid rgba(45, 90, 39, 0.2);
+  border-top-color: var(--green);
+  animation: syncSpin 0.75s linear infinite;
+}

@@ -1,4 +1,7 @@
 {
+  "devCommand": "npm run dev:vite",
+  "buildCommand": "vite build",
+  "outputDirectory": "dist",
   "headers": [
     {
       "source": "/index.html",

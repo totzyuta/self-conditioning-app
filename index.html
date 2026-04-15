@@ -1,26 +1,72 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ja">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
-  <title>Self Conditioning App</title>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+    <title>Self Conditioning App</title>
 
-  <!-- PWA Manifest & Metadata -->
-  <link rel="manifest" href="/manifest.json" />
-  <meta name="theme-color" content="#2D5A27" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Conditioning" />
-  <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect fill='%232D5A27' width='180' height='180'/><text x='50%' y='50%' font-size='90' font-weight='bold' fill='white' text-anchor='middle' dominant-baseline='central' font-family='system-ui'>◆</text></svg>" />
-  <script type="module" src="/src/main.jsx"></script>
-</head>
-<body>
-<div id="root"></div>
-<!-- React app mounts here -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#2D5A27" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Conditioning" />
+    <link
+      rel="apple-touch-icon"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect fill='%232D5A27' width='180' height='180'/><text x='50%' y='50%' font-size='90' font-weight='bold' fill='white' text-anchor='middle' dominant-baseline='central' font-family='system-ui'>◆</text></svg>"
+    />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+    <title>Self Conditioning App</title>
 
-/* ═══ App Version ═══════════════════════════════════════  */
-const APP_VERSION = "v1.0.5";
+    <!-- PWA Manifest & Metadata -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#2D5A27" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Conditioning" />
+    <link
+      rel="apple-touch-icon"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect fill='%232D5A27' width='180' height='180'/><text x='50%' y='50%' font-size='90' font-weight='bold' fill='white' text-anchor='middle' dominant-baseline='central' font-family='system-ui'>◆</text></svg>"
+    />
+  </head>
+  <body>
+    <div id="root"></div>
+    <template id="legacy_inlined_app_kept_temporarily">
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+    <title>Self Conditioning App</title>
 
+    <!-- PWA Manifest & Metadata -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#2D5A27" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Conditioning" />
+    <link
+      rel="apple-touch-icon"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect fill='%232D5A27' width='180' height='180'/><text x='50%' y='50%' font-size='90' font-weight='bold' fill='white' text-anchor='middle' dominant-baseline='central' font-family='system-ui'>◆</text></svg>"
+    />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
+<!-- legacy template continues -->
+
+<script type="text/plain">
 /* ═══ Storage ═══════════════════════════════════════════ */
 const SK     = "phl_tracker_v1";
 const AUTH_K = "phl_auth_v1";
@@ -443,31 +489,31 @@ function PasswordGate({ onAuth }) {
 /* ═══ Seed Data ═════════════════════════════════════════ */
 const SEED_RAW = [
   {"date":"2026-02-14","condition":null,"mainWorkout":"プロジェクト設定","weightRepSet":"—","subWorkout":"—","remarks":"トレーニングノートの出力ルールを「2週間分の表形式 / コンディション・重量・回数・セット項目」に固定することを決定。Body Beauty Project本格始動。"},
-  {"date":"2026-02-23","condition":null,"mainWorkout":"SQ (スクワット)","weightRepSet":"52.5kg / PB更新","subWorkout":"コンパウンド種目中心","remarks":"スクワットで自己ベストを更新。2月中旬から下旬にかけて45kgから52.5kgまで重量を伸ばすことに成功。"},
-  {"date":"2026-02-26","condition":null,"mainWorkout":"ディロード開始","weightRepSet":"—","subWorkout":"ダンベル種目中心","remarks":"中枢神経系の疲労を感じたため、強度を落としたディロード期間へ移行。技術練習と回復を優先。"},
-  {"date":"2026-02-27","condition":null,"mainWorkout":"DBP / DF","weightRepSet":"DBP 8kg (10*3) / DF 8kg (10*3)","subWorkout":"技術練習","remarks":"低負荷のダンベル種目で胸の収縮を確認。肩や手首の違和感に対応。"},
-  {"date":"2026-02-28","condition":null,"mainWorkout":"Active Recovery","weightRepSet":"8,000-10,000 steps","subWorkout":"Walking","remarks":"神経系回復のためのウォーキング。グリップ調整などの技術的な確認のみ実施。"},
-  {"date":"2026-03-03","condition":null,"mainWorkout":"IDC / サイドレイズ","weightRepSet":"IDC 8kg (10*3) / SR 7kg (10*3)","subWorkout":"なし","remarks":"ジム復帰初日。「握らない」意識でリハビリ。左腕に顕著な疲労の左右差（デバッグが必要）。"},
+  {"date":"2026-02-23","condition":null,"mainWorkout":"SQ (スクワット) 52.5kg","weightRepSet":"52.5kg","subWorkout":"—","remarks":"スクワットで自己ベストを更新。2月中旬から下旬にかけて45kgから52.5kgまで重量を伸ばすことに成功。\nPB更新\nコンパウンド種目中心"},
+  {"date":"2026-02-26","condition":null,"mainWorkout":"ディロード開始","weightRepSet":"—","subWorkout":"—","remarks":"中枢神経系の疲労を感じたため、強度を落としたディロード期間へ移行。技術練習と回復を優先。\nダンベル種目中心"},
+  {"date":"2026-02-27","condition":null,"mainWorkout":"DBP 8kg (10*3) / DF 8kg (10*3)","weightRepSet":"8kg (10*3) / 8kg (10*3)","subWorkout":"—","remarks":"低負荷のダンベル種目で胸の収縮を確認。肩や手首の違和感に対応。\n技術練習"},
+  {"date":"2026-02-28","condition":null,"mainWorkout":"Active Recovery","weightRepSet":"—","subWorkout":"—","remarks":"神経系回復のためのウォーキング。グリップ調整などの技術的な確認のみ実施。\n8,000-10,000 steps\nWalking"},
+  {"date":"2026-03-03","condition":null,"mainWorkout":"IDC 8kg (10*3) / SR 7kg (10*3)","weightRepSet":"8kg (10*3) / 7kg (10*3)","subWorkout":"—","remarks":"ジム復帰初日。「握らない」意識でリハビリ。左腕に顕著な疲労の左右差（デバッグが必要）。"},
   {"date":"2026-03-07","condition":null,"mainWorkout":"完全休息","weightRepSet":"—","subWorkout":"—","remarks":"休み切りフェーズ。身体の信号を優先し、リカバリーに専念。"},
   {"date":"2026-03-11","condition":4.5,"mainWorkout":"休息","weightRepSet":"—","subWorkout":"—","remarks":"ニュートラル（5.0）まであと一息。翌日3/12からの本格再開に向けてOSを安定させる。"},
-  {"date":"2026-03-12","condition":4.8,"mainWorkout":"BP (ベンチプレス)","weightRepSet":"40kg / (10, 10, 9) / 3s","subWorkout":"BB-Curl 20kg (7,7,6)","remarks":"かなり久しぶりのトレーニング。やっとやっと、回復して来た気がする。ベンチプレスで、かなり回復。"},
+  {"date":"2026-03-12","condition":4.8,"mainWorkout":"BP (ベンチプレス) 40kg (10,10,9)","weightRepSet":"40kg (10,10,9)","subWorkout":"BB-Curl 20kg (7,7,6)","remarks":"かなり久しぶりのトレーニング。やっとやっと、回復して来た気がする。ベンチプレスで、かなり回復。\nテンポ 3s"},
   {"date":"2026-03-13","condition":5.2,"mainWorkout":"休息","weightRepSet":"—","subWorkout":"—","remarks":"5の大台を突破。OS安定。"},
-  {"date":"2026-03-14","condition":5.6,"mainWorkout":"Home (アブローラー)","weightRepSet":"自重 / (10, 7, 6) / 3s","subWorkout":"なし","remarks":"アブローラー（膝コロ）。2セット目の粘り増。上昇気流。"},
-  {"date":"2026-03-15","condition":5.2,"mainWorkout":"RDL (ルーマニアンデッドリフト)","weightRepSet":"26.5kg / (10, 10, 8) / 3s","subWorkout":"バックエクステンション (7/7/7)","remarks":"メインをSQからRDLへ変更。大臀筋下部重視。"},
-  {"date":"2026-03-17","condition":null,"mainWorkout":"Home (アブローラー)","weightRepSet":"自重 / (6, 6, 6) / 3s","subWorkout":"なし","remarks":"アブローラー（膝コロ）。"},
-  {"date":"2026-03-18","condition":null,"mainWorkout":"PU (懸垂)","weightRepSet":"🟣バンド / (10, 7, 6) / 3s","subWorkout":"LPD 30kg (10*3) / DL 9kg (10/15)","remarks":"背中の感覚はまだ。二頭筋に熱感がある。"},
+  {"date":"2026-03-14","condition":5.6,"mainWorkout":"Home (アブローラー) 自重 (10,7,6)","weightRepSet":"自重 (10,7,6)","subWorkout":"—","remarks":"アブローラー（膝コロ）。2セット目の粘り増。上昇気流。\nテンポ 3s"},
+  {"date":"2026-03-15","condition":5.2,"mainWorkout":"RDL (ルーマニアンデッドリフト) 26.5kg (10,10,8)","weightRepSet":"26.5kg (10,10,8)","subWorkout":"バックエクステンション (7/7/7)","remarks":"メインをSQからRDLへ変更。大臀筋下部重視。\nテンポ 3s"},
+  {"date":"2026-03-17","condition":null,"mainWorkout":"Home (アブローラー) 自重 (6,6,6)","weightRepSet":"自重 (6,6,6)","subWorkout":"—","remarks":"アブローラー（膝コロ）。\nテンポ 3s"},
+  {"date":"2026-03-18","condition":null,"mainWorkout":"PU (懸垂) 🟣バンド (10,7,6)","weightRepSet":"🟣バンド (10,7,6)","subWorkout":"LPD 30kg (10*3) / DL 9kg (10/15)","remarks":"背中の感覚はまだ。二頭筋に熱感がある。\nテンポ 3s"},
   {"date":"2026-03-20","condition":5.3,"mainWorkout":"休息","weightRepSet":"—","subWorkout":"—","remarks":"背中にしっかり筋肉痛！嬉しい。胸の肩側の付け根や三頭筋にも心地よい張り。"},
-  {"date":"2026-03-21","condition":6.0,"mainWorkout":"BP (ベンチプレス)","weightRepSet":"45kg / (5, 5, 5) / 3s","subWorkout":"SC 15kg (10*3) / IC 9kg (10,7,7)","remarks":"BP 45kg初挑戦完遂。腕のボリュームも狙った構成。コンディション6.0到達！"},
-  {"date":"2026-03-22","condition":null,"mainWorkout":"Home (アブローラー)","weightRepSet":"自重 / (7, 7, 6) / 3s","subWorkout":"なし","remarks":"アブローラー（膝コロ）。"},
-  {"date":"2026-03-23","condition":null,"mainWorkout":"Home (アブローラー)","weightRepSet":"自重 / (7, 7, 7) / 3s","subWorkout":"なし","remarks":"アブローラー（膝コロ）。7回3セットで安定。"},
-  {"date":"2026-03-24","condition":null,"mainWorkout":"RDL (ルーマニアンデッドリフト)","weightRepSet":"25kg / (10, 10, 10) / 3s","subWorkout":"バックエクステンション (10, 10, 10)","remarks":"RDL 25kgで完遂。バックエクステンションも10回3セット。"},
+  {"date":"2026-03-21","condition":6.0,"mainWorkout":"BP (ベンチプレス) 45kg (5,5,5)","weightRepSet":"45kg (5,5,5)","subWorkout":"SC 15kg (10*3) / IC 9kg (10,7,7)","remarks":"BP 45kg初挑戦完遂。腕のボリュームも狙った構成。コンディション6.0到達！\nテンポ 3s"},
+  {"date":"2026-03-22","condition":null,"mainWorkout":"Home (アブローラー) 自重 (7,7,6)","weightRepSet":"自重 (7,7,6)","subWorkout":"—","remarks":"アブローラー（膝コロ）。\nテンポ 3s"},
+  {"date":"2026-03-23","condition":null,"mainWorkout":"Home (アブローラー) 自重 (7,7,7)","weightRepSet":"自重 (7,7,7)","subWorkout":"—","remarks":"アブローラー（膝コロ）。7回3セットで安定。\nテンポ 3s"},
+  {"date":"2026-03-24","condition":null,"mainWorkout":"RDL (ルーマニアンデッドリフト) 25kg (10,10,10)","weightRepSet":"25kg (10,10,10)","subWorkout":"バックエクステンション (10,10,10)","remarks":"RDL 25kgで完遂。バックエクステンションも10回3セット。\nテンポ 3s"},
   {"date":"2026-03-25","condition":5.5,"mainWorkout":"休息","weightRepSet":"—","subWorkout":"—","remarks":"4日連続稼働後のOS確認。5.0以上をキープしており良好。"},
-  {"date":"2026-03-26","condition":null,"mainWorkout":"PU (懸垂)","weightRepSet":"🟣バンド / (10, 10, 10) / 3s","subWorkout":"LPD (10*3) / BP 40kg (9,10,6) / DL 10kg (10*3)","remarks":"懸垂10回3セット完遂。BP強化のため、サブ日に軽重量で組み込むテスト。"},
-  {"date":"2026-03-30","condition":5.6,"mainWorkout":"Home (アブローラー)","weightRepSet":"自重 / (7, 6, 6) / 3s","subWorkout":"なし","remarks":"アブローラー（膝コロ）。高コンディションを維持しつつ再始動。"},
+  {"date":"2026-03-26","condition":null,"mainWorkout":"PU (懸垂) 🟣バンド (10,10,10)","weightRepSet":"🟣バンド (10,10,10)","subWorkout":"LPD (10*3) / BP 40kg (9,10,6) / DL 10kg (10*3)","remarks":"懸垂10回3セット完遂。BP強化のため、サブ日に軽重量で組み込むテスト。\nテンポ 3s"},
+  {"date":"2026-03-30","condition":5.6,"mainWorkout":"Home (アブローラー) 自重 (7,6,6)","weightRepSet":"自重 (7,6,6)","subWorkout":"—","remarks":"アブローラー（膝コロ）。高コンディションを維持しつつ再始動。\nテンポ 3s"},
   {"date":"2026-04-02","condition":4.8,"mainWorkout":"休息","weightRepSet":"—","subWorkout":"—","remarks":"コンディション 4.8。少し落ち着いた数値。"},
   {"date":"2026-04-06","condition":5.3,"mainWorkout":"休息","weightRepSet":"—","subWorkout":"—","remarks":"コンディション5.3まで上昇。エネルギーが戻ってきた感覚。"},
-  {"date":"2026-04-09","condition":null,"mainWorkout":"PU (懸垂) / RDL","weightRepSet":"懸垂 (8, 7, 6) / RDL 30kg (7, 7, 7)","subWorkout":"LPD (3s) / DL 10kg (10, 10, 10)","remarks":"RDLを30kgに増量。背面全体の出力を強化。"},
-  {"date":"2026-04-12","condition":6.1,"mainWorkout":"BP (ベンチプレス)","weightRepSet":"45kg / (7, 6, 4) / 3s","subWorkout":"DBP 14kg (9, 8, 7) / DF 8kg (9)","remarks":"BP 1セット目自己ベスト更新。DF 2セット目から左手首の痛みにより中断。要デバッグ。コンディション最高値。"}
+  {"date":"2026-04-09","condition":null,"mainWorkout":"PU (懸垂) 自重 (8,7,6) / RDL 30kg (7,7,7)","weightRepSet":"自重 (8,7,6) / 30kg (7,7,7)","subWorkout":"LPD (3s) / DL 10kg (10,10,10)","remarks":"RDLを30kgに増量。背面全体の出力を強化。"},
+  {"date":"2026-04-12","condition":6.1,"mainWorkout":"BP (ベンチプレス) 45kg (7,6,4)","weightRepSet":"45kg (7,6,4)","subWorkout":"DBP 14kg (9,8,7) / DF 8kg (9)","remarks":"BP 1セット目自己ベスト更新。DF 2セット目から左手首の痛みにより中断。要デバッグ。コンディション最高値。\nテンポ 3s"}
 ];
 
 function classifyType(mw) {
@@ -2500,4 +2546,9 @@ function App() {
 }
 
 </body>
+</html>
+</script>
+    </template>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
 </html>
