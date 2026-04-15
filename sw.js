@@ -1,7 +1,7 @@
 // NOTE:
 // - API 応答をキャッシュすると「保存→少し後に古い GET が返って state が巻き戻る」事故が起きる。
 // - キャッシュは静的アセット専用にする（/api/* は network-only）。
-const CACHE_VERSION = '1.0.1';
+const CACHE_VERSION = '1.0.2';
 const CACHE_NAME = `self-conditioning-v2-cache-${CACHE_VERSION}`;
 const ASSETS_TO_CACHE = [
   '/',
@@ -64,8 +64,10 @@ self.addEventListener('fetch', (event) => {
         .then((response) => {
           // 新しい response をキャッシュに保存
           if (response && response.status === 200) {
+            // NOTE: clone は body が消費される前に同期的に行う必要がある
+            const responseClone = response.clone();
             const cache = caches.open(CACHE_NAME);
-            cache.then((c) => c.put(request, response.clone()));
+            cache.then((c) => c.put(request, responseClone));
           }
           return response;
         })
@@ -85,8 +87,10 @@ self.addEventListener('fetch', (event) => {
       caches.match(request).then((cachedResponse) => {
         return cachedResponse || fetch(request).then((response) => {
           if (response && response.status === 200) {
+            // NOTE: clone は body が消費される前に同期的に行う必要がある
+            const responseClone = response.clone();
             const cache = caches.open(CACHE_NAME);
-            cache.then((c) => c.put(request, response.clone()));
+            cache.then((c) => c.put(request, responseClone));
           }
           return response;
         });
