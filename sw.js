@@ -46,6 +46,13 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
+  // Dev (Vite localhost) should be network-only.
+  // Caching module requests can cause stale code + confusing runtime errors.
+  if (url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname === '::1') {
+    event.respondWith(fetch(request));
+    return;
+  }
+
   // Never cache non-GET.
   if (request.method !== 'GET') {
     return;
