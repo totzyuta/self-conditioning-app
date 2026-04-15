@@ -33,4 +33,21 @@
 
 ## 同期の向き
 
+- **ユーザー単位:** セッションは `phl_sync_session_v2`（`lib/session.js`）。V2 ローカル状態は `phl_tracker_v2__{userId}`（`lib/storageV2.js`）。ログイン中の `user_id` と Supabase 行は 1:1。
 - ログイン後、`/api/v2/state` GET でリモートを取り込み、日単位の更新は PUT。競合時は 409 と `refetch` パターン。
+
+## 依存の向き（import）
+
+- `src/lib/*` — React を import しない（純関数・fetch・localStorage ラッパ）。
+- `src/pages/*` — `components/*` と `lib/*` を参照。アプリ状態は `App.jsx` から props で渡す現状維持。
+- `src/components/*` — `lib/*` / `hooks/*` を参照。サーバー用コードは `api/`（リポジトリ直下）と混同しないこと。
+
+## タスク別の参照先（例）
+
+| 変更したいもの | 主に見る場所 |
+|----------------|--------------|
+| コンディション・チャート UI | `src/components/condition/` |
+| トレーニング記録フルスクリーン | `src/components/training/TrainingRecordScreen.jsx` |
+| クライアント同期 API 呼び出し | `src/lib/apiV2.js`（サーバー実装は `api/v2/state.js`） |
+| 許可ユーザー・バージョン定数 | `src/lib/constants.js` + デプロイ `ALLOWED_SYNC_USERS` / `SYNC_PASSWORD` |
+| 表示用フォーマット | `src/lib/format.js` |
