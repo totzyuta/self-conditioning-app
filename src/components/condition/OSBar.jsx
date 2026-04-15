@@ -1,9 +1,9 @@
 import React from "react";
-import { condColor } from "../../lib/format.js";
 
+// Dashboard OS bar: brand green to match the hero score (not condColor).
 export default function OSBar({ value }) {
   const pct = (value / 10) * 100;
-  const c = condColor(value);
+  const c = "var(--green)";
   const diff = value - 5.0;
   return (
     <div>
@@ -29,7 +29,7 @@ export default function OSBar({ value }) {
           transform: "translate(-50%,-50%)",
           width: 13, height: 13, borderRadius: "50%",
           background: c, border: "2.5px solid var(--bg)",
-          boxShadow: `0 0 0 1.5px ${c}60`,
+          boxShadow: "0 0 0 1.5px rgba(45, 90, 39, 0.38)",
           transition: "left .7s cubic-bezier(.34,1.56,.64,1)",
         }} />
       </div>
