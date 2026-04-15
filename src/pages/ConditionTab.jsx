@@ -197,7 +197,7 @@ export default function ConditionTab({
                     <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 1 }}>{d.wdJA}</div>
                   </td>
                   <td style={{ paddingTop: 11, paddingBottom: 11 }}>
-                    <CondOrb value={row.score} size={40} />
+                    <CondOrb value={row.score} size={40} palette="band" />
                   </td>
                   <td>
                     {hasNote ? (

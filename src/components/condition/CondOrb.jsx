@@ -1,8 +1,9 @@
 import React from "react";
-import { condColor } from "../../lib/format.js";
+import { condColor, condLabelColor } from "../../lib/format.js";
 
-export default function CondOrb({ value, size = 42 }) {
-  const c = condColor(value);
+// palette: "continuous" = condColor; "band" = condLabelColor (tokens --cond-band-*).
+export default function CondOrb({ value, size = 42, palette = "continuous" }) {
+  const c = palette === "band" ? condLabelColor(value) : condColor(value);
   return (
     <div style={{
       width: size, height: size, borderRadius: "50%",
