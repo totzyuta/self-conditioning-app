@@ -21,6 +21,7 @@ create table if not exists public.conditions (
   user_id text not null references public.users(id) on delete cascade,
   date date not null,
   score numeric,
+  note text not null default '',
   updated_at timestamptz not null default now(),
   primary key (user_id, date)
 );

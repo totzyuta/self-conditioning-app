@@ -12,6 +12,7 @@ export async function putRemoteDayV2({
   password,
   date,
   conditionScore,
+  conditionNote,
   note,
   items,
   clientLast,
@@ -22,7 +23,7 @@ export async function putRemoteDayV2({
       "Content-Type": "application/json",
       "x-sync-password": password,
     },
-    body: JSON.stringify({ date, conditionScore, note, items, clientLast }),
+    body: JSON.stringify({ date, conditionScore, conditionNote, note, items, clientLast }),
   });
   const data = await res.json().catch(() => null);
   if (!res.ok || !data?.ok) {

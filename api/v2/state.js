@@ -72,7 +72,7 @@ export default async function handler(req, res) {
       };
 
       const [conds, sessions, items] = await Promise.all([
-        rangeFilter(supabase.from("conditions").select("date, score, updated_at")),
+        rangeFilter(supabase.from("conditions").select("date, score, note, updated_at")),
         rangeFilter(supabase.from("training_sessions").select("date, note, updated_at")),
         rangeFilter(supabase.from("training_items").select("id, date, category, exercise_name, weight, reps, sets, sort_order, updated_at").order("date", { ascending: true }).order("sort_order", { ascending: true })),
       ]);
@@ -105,6 +105,7 @@ export default async function handler(req, res) {
         if (Number.isFinite(n)) conditionScore = n;
       }
       const note = typeof body.note === "string" ? body.note : undefined;
+      const conditionNote = typeof body.conditionNote === "string" ? body.conditionNote : undefined;
       const items = Array.isArray(body.items) ? body.items : undefined;
 
       // Optional optimistic concurrency: client can send last known timestamps for this date.
@@ -138,10 +139,23 @@ export default async function handler(req, res) {
         }
       }
 
-      if (conditionScore !== undefined) {
+      if (conditionScore !== undefined || conditionNote !== undefined) {
+        const ex = await supabase
+          .from("conditions")
+          .select("score, note")
+          .eq("user_id", userId)
+          .eq("date", date)
+          .maybeSingle();
+        if (ex.error) return json(res, 500, { ok: false, error: ex.error.message });
+        const prev = ex.data || null;
+        const mergedScore = conditionScore !== undefined ? conditionScore : (prev?.score ?? null);
+        const mergedNote = conditionNote !== undefined ? conditionNote : String(prev?.note ?? "");
         const up = await supabase
           .from("conditions")
-          .upsert({ user_id: userId, date, score: conditionScore }, { onConflict: "user_id,date" })
+          .upsert(
+            { user_id: userId, date, score: mergedScore, note: mergedNote },
+            { onConflict: "user_id,date" },
+          )
           .select("updated_at")
           .single();
         if (up.error) return json(res, 500, { ok: false, error: up.error.message });
