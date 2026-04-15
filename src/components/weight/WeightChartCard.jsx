@@ -7,6 +7,64 @@ import { useElementWidth } from "../../hooks/useElementWidth.js";
 
 const LINE = "#2D5A27";
 
+function clamp(n, min, max) {
+  return Math.min(max, Math.max(min, n));
+}
+
+function pickWeightTickStep(range, maxTicks = 7) {
+  const steps = [0.5, 1, 2, 5];
+  const safeRange = Math.max(0, Number(range) || 0);
+  if (safeRange <= 0) return 0.5;
+
+  // Prefer finer steps, but keep tick count within maxTicks.
+  for (const step of steps) {
+    const ticks = Math.floor(safeRange / step) + 1;
+    if (ticks <= maxTicks) return step;
+  }
+  return 5;
+}
+
+function niceBounds(minV, maxV, step, padSteps = 2) {
+  const pad = (Number(step) || 1) * padSteps;
+  const min = Number(minV);
+  const max = Number(maxV);
+  const lo = Number.isFinite(min) ? min - pad : 40;
+  const hi = Number.isFinite(max) ? max + pad : 80;
+  const s = Number(step) || 1;
+
+  const niceMin = Math.floor(lo / s) * s;
+  const niceMax = Math.ceil(hi / s) * s;
+  return { niceMin, niceMax };
+}
+
+function buildTicks(yMin, yMax, step, maxTicks = 7) {
+  const s = Number(step) || 1;
+  const start = Number(yMin);
+  const end = Number(yMax);
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return [];
+
+  const ticks = [];
+  const limit = maxTicks + 2; // just in case
+  for (let i = 0; i < 200; i++) {
+    const v = start + s * i;
+    if (v > end + 1e-9) break;
+    // Normalize float noise (0.5 steps)
+    const vv = s === 0.5 ? Math.round(v * 2) / 2 : Math.round(v);
+    ticks.push(vv);
+    if (ticks.length >= limit) break;
+  }
+  // If still too many (shouldn't happen), downsample evenly.
+  if (ticks.length > maxTicks) {
+    const keep = [];
+    const stepIdx = (ticks.length - 1) / (maxTicks - 1);
+    for (let i = 0; i < maxTicks; i++) {
+      keep.push(ticks[Math.round(i * stepIdx)]);
+    }
+    return keep;
+  }
+  return ticks;
+}
+
 export default function WeightChartCard({ v2, defaultPeriod = "1m", height = 140 }) {
   const [period, setPeriod] = useState(defaultPeriod);
   const isMobile = useIsMobile(520);
@@ -33,11 +91,12 @@ export default function WeightChartCard({ v2, defaultPeriod = "1m", height = 140
   const maxV = ys.length ? Math.max(...ys) : null;
   const minV = ys.length ? Math.min(...ys) : null;
 
-  const pad = 1.5;
-  const yMin = minV != null ? Math.floor((minV - pad) * 2) / 2 : 40;
-  const yMax = maxV != null ? Math.ceil((maxV + pad) * 2) / 2 : 80;
-  const ticks = [];
-  for (let v = yMin; v <= yMax; v += 1) ticks.push(v);
+  const range = (minV != null && maxV != null) ? (maxV - minV) : 0;
+  const tickStep = pickWeightTickStep(range, 7);
+  const { niceMin, niceMax } = niceBounds(minV, maxV, tickStep, 2);
+  const yMin = clamp(niceMin, -200, 500);
+  const yMax = clamp(niceMax, -200, 500);
+  const ticks = buildTicks(yMin, yMax, tickStep, 7);
 
   return (
     <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10, padding: "18px 18px 12px" }}>
