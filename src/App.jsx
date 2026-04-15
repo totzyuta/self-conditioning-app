@@ -1232,7 +1232,7 @@ export default function App() {
   });
   const daySummaries = useMemo(() => daySummariesFromV2(v2), [v2]);
   const [syncErr, setSyncErr] = useState(null);
-  /** 全画面ブロックは「シードデータにリセット」実行中のみ（移行・初回同期では出さない） */
+  /** 全画面ブロックは「シードデータにリセット」実行中のみ */
   const [seedResetBlocking, setSeedResetBlocking] = useState(false);
   const [tab, setTab] = useState("dashboard");
   const [updateAvailable, setUpdateAvailable] = useState(false);
@@ -1899,8 +1899,6 @@ export default function App() {
                     ? (latestLocalBackup ? new Date(latestLocalBackup.ts).toLocaleString() : "なし")
                     : (latestRemoteBackup ? new Date(latestRemoteBackup.ts).toLocaleString() : "なし")}
                 </div>
-
-                {/* V2移行後は文字列ベース正規化は不要 */}
 
                 {isLocalhost && (
                   <>
