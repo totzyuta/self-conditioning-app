@@ -75,9 +75,9 @@ export default function StepsChartCard({ v2, defaultPeriod = "1m", height = 140 
         </div>
       </div>
 
-      {chartPoints.length >= 2 ? (
-        <>
-          <div ref={chartWrapRef}>
+      <div ref={chartWrapRef}>
+        {chartPoints.length >= 2 ? (
+          <>
             <SmoothLineChart
               points={chartPoints}
               w={chartW}
@@ -95,36 +95,36 @@ export default function StepsChartCard({ v2, defaultPeriod = "1m", height = 140 
                 return Number.isFinite(n) ? n.toLocaleString() : "—";
               }}
             />
-          </div>
-          <div style={{ display: "flex", borderTop: "1px solid var(--border)", marginTop: 12 }}>
-            {[
-              { label: "平均", val: avg != null ? `${avg.toLocaleString()}` : "—" },
-              { label: "最高", val: maxV != null ? `${maxV.toLocaleString()}` : "—" },
-              { label: "最低", val: minV != null ? `${minV.toLocaleString()}` : "—" },
-              { label: "記録", val: ys.length },
-            ].map((s, i) => (
-              <div
-                key={s.label}
-                style={{
-                  flex: 1,
-                  textAlign: "center",
-                  padding: "10px 4px",
-                  borderRight: i < 3 ? "1px solid var(--border)" : "none",
-                }}
-              >
-                <div style={{ fontSize: 9, color: "var(--muted)", letterSpacing: ".08em", marginBottom: 3 }}>{s.label}</div>
-                <div style={{ fontSize: 15, fontWeight: 300, color: "var(--text)", letterSpacing: "-0.5px", fontVariantNumeric: "tabular-nums" }}>
-                  {s.val}
+            <div style={{ display: "flex", borderTop: "1px solid var(--border)", marginTop: 12 }}>
+              {[
+                { label: "平均", val: avg != null ? `${avg.toLocaleString()}` : "—" },
+                { label: "最高", val: maxV != null ? `${maxV.toLocaleString()}` : "—" },
+                { label: "最低", val: minV != null ? `${minV.toLocaleString()}` : "—" },
+                { label: "記録", val: ys.length },
+              ].map((s, i) => (
+                <div
+                  key={s.label}
+                  style={{
+                    flex: 1,
+                    textAlign: "center",
+                    padding: "10px 4px",
+                    borderRight: i < 3 ? "1px solid var(--border)" : "none",
+                  }}
+                >
+                  <div style={{ fontSize: 9, color: "var(--muted)", letterSpacing: ".08em", marginBottom: 3 }}>{s.label}</div>
+                  <div style={{ fontSize: 15, fontWeight: 300, color: "var(--text)", letterSpacing: "-0.5px", fontVariantNumeric: "tabular-nums" }}>
+                    {s.val}
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
+          </>
+        ) : (
+          <div style={{ textAlign: "center", padding: "32px 0", color: "var(--muted)", fontSize: 12 }}>
+            この期間の歩数データがありません
           </div>
-        </>
-      ) : (
-        <div style={{ textAlign: "center", padding: "32px 0", color: "var(--muted)", fontSize: 12 }}>
-          この期間の歩数データがありません
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
