@@ -6,20 +6,13 @@ import TrainingTabPage from "./pages/TrainingTab.jsx";
 import { V2_SEED_DAYS } from "./seed/v2Seed.js";
 
 /* ═══ App Version ═══════════════════════════════════════  */
-const APP_VERSION = "v1.1.0";
+const APP_VERSION = "2.0.0";
 
 /* ═══ Storage (per logical user_id) ═══════════════════════ */
 const SESSION_KEY = "phl_sync_session_v2";
-const SCHEMA_VERSION_V2 = 2;
 
-function storageSk1(uid) {
-  return `phl_tracker_v1__${uid}`;
-}
 function storageSk2(uid) {
   return `phl_tracker_v2__${uid}`;
-}
-function storageSchemaKey(uid) {
-  return `phl_schema_version__${uid}`;
 }
 
 /** ログインで許可する組み合わせ（API の ALLOWED_SYNC_USERS と一致させる） */
@@ -59,23 +52,7 @@ function defaultLoginUserId() {
   return "totzyu";
 }
 
-function loadLocalLogs(userId) {
-  if (!userId) return { logs: null, updatedAtMs: 0 };
-  const raw = localStorage.getItem(storageSk1(userId));
-  if (!raw) return { logs: null, updatedAtMs: 0 };
-  const parsed = safeJsonParse(raw);
-  if (Array.isArray(parsed)) return { logs: parsed, updatedAtMs: 0 };
-  if (parsed && Array.isArray(parsed.logs)) {
-    const updatedAtMs = typeof parsed.updatedAtMs === "number" ? parsed.updatedAtMs : 0;
-    return { logs: parsed.logs, updatedAtMs };
-  }
-  return { logs: null, updatedAtMs: 0 };
-}
 
-function saveLocalLogs(userId, logs, updatedAtMs = Date.now()) {
-  if (!userId) return;
-  try { localStorage.setItem(storageSk1(userId), JSON.stringify({ logs, updatedAtMs })); } catch {}
-}
 
 function loadLocalV2(userId) {
   if (!userId) return { state: null, updatedAtMs: 0 };
@@ -93,15 +70,7 @@ function saveLocalV2(userId, state, updatedAtMs = Date.now()) {
   try { localStorage.setItem(storageSk2(userId), JSON.stringify({ state, updatedAtMs })); } catch {}
 }
 
-function getSchemaVersion(userId) {
-  if (!userId) return 0;
-  try { return parseInt(localStorage.getItem(storageSchemaKey(userId)) || "0", 10) || 0; } catch { return 0; }
-}
 
-function setSchemaVersion(userId, v) {
-  if (!userId) return;
-  try { localStorage.setItem(storageSchemaKey(userId), String(v)); } catch {}
-}
 
 function asNullableScore(value) {
   if (value == null) return null;
@@ -109,34 +78,7 @@ function asNullableScore(value) {
   return Number.isFinite(n) ? n : null;
 }
 
-async function fetchRemoteState(userId, password) {
-  const res = await fetch(`/api/state?user_id=${encodeURIComponent(userId)}`, {
-    headers: { "x-sync-password": password },
-  });
-  const data = await res.json().catch(() => null);
-  if (!res.ok || !data?.ok) throw new Error(data?.error || `HTTP ${res.status}`);
-  return data;
-}
 
-async function pushRemoteState(userId, password, logs, lastUpdatedAtIso) {
-  const res = await fetch(`/api/state?user_id=${encodeURIComponent(userId)}`, {
-    method: "PUT",
-    headers: {
-      "Content-Type": "application/json",
-      "x-sync-password": password,
-      ...(lastUpdatedAtIso ? { "x-last-updated-at": lastUpdatedAtIso } : {}),
-    },
-    body: JSON.stringify({ logs }),
-  });
-  const data = await res.json().catch(() => null);
-  if (!res.ok || !data?.ok) {
-    const err = new Error(data?.error || `HTTP ${res.status}`);
-    err.code = res.status;
-    err.data = data;
-    throw err;
-  }
-  return data;
-}
 
 async function fetchRemoteStateV2(userId, password) {
   const res = await fetch(`/api/v2/state?user_id=${encodeURIComponent(userId)}`, {
@@ -189,225 +131,6 @@ async function wipeRemoteStateV2(userId, password) {
   return data;
 }
 
-function mergeLogsByDate(localLogs, remoteLogs) {
-  const byDate = new Map();
-  (Array.isArray(remoteLogs) ? remoteLogs : []).forEach(l => { if (l?.date) byDate.set(l.date, l); });
-  (Array.isArray(localLogs) ? localLogs : []).forEach(l => { if (l?.date) byDate.set(l.date, l); });
-  return Array.from(byDate.values()).filter(Boolean).sort((a, b) => new Date(a.date) - new Date(b.date));
-}
-
-/* ═══ Legacy string helpers — v1→V2 移行の one-time のみ（実行時 UI では未使用）══ */
-function splitSlash(s) {
-  return (s || "")
-    .split(" / ")
-    .map(x => x.trim())
-    .filter(Boolean)
-    .filter(x => x !== "—" && x !== "なし");
-}
-
-function looksLikeExerciseList(s) {
-  const t = (s || "").trim();
-  if (!t || t === "—" || t === "なし") return false;
-  if (t.includes("kg") || t.includes("(") || t.includes(")")) return true;
-  if (t.includes("/") || t.includes("🟣") || t.includes("バンド") || t.includes("自重") || t.includes("膝コロ")) return true;
-  return false;
-}
-
-function parseWeightRepSetMetrics(wrs) {
-  const segs = splitSlash(wrs);
-  if (!segs.length) return { weight: "", sets: "", note: "" };
-
-  let weight = "";
-  let sets = "";
-  const notes = [];
-
-  const isWeightTok = (tok) => {
-    if (!tok) return false;
-    if (tok.includes("kg")) return true;
-    if (/^\\d+(\\.\\d+)?$/.test(tok)) return true;
-    if (tok === "自重" || tok === "膝コロ" || tok.includes("バンド") || tok.includes("🟣")) return true;
-    return false;
-  };
-
-  segs.forEach(s => {
-    const t = s.trim();
-    const m = t.match(/^\\(([^)]+)\\)$/);
-    if (!sets && m) { sets = (m[1] || "").trim(); return; }
-    if (!weight && isWeightTok(t)) { weight = t; return; }
-    notes.push(t);
-  });
-
-  return { weight, sets, note: notes.join(" / ").trim() };
-}
-
-function normalizeExerciseSegment(seg) {
-  const raw = (seg || "").trim();
-  if (!raw) return null;
-
-  let name = "";
-  let weight = "";
-  let sets = "";
-  let note = "";
-
-  // Prefer "(...)" as sets only when it looks like sets/reps info (numbers, commas, * or seconds).
-  const parenAll = Array.from(raw.matchAll(/\\(([^)]+)\\)/g));
-  const pickSets = (s) => {
-    const t = (s || "").trim();
-    if (!t) return false;
-    if (/[0-9]/.test(t)) return true;
-    if (t.includes(",") || t.includes("*") || t.includes("×")) return true;
-    if (/^\\s*\\d+(\\.\\d+)?s\\s*$/i.test(t)) return true;
-    if (t.endsWith("s")) return true; // e.g. "3s"
-    return false;
-  };
-  let rawForParse = raw;
-  for (const m of parenAll) {
-    const inside = (m?.[1] || "").trim();
-    if (!sets && pickSets(inside)) {
-      sets = inside;
-      rawForParse = rawForParse.replace(m[0], "").trim();
-    }
-  }
-
-  const withoutParen = rawForParse.trim();
-  const parts = withoutParen.split(/\\s+/).filter(Boolean);
-
-  // Heuristic: last "kg/number/selfweight/band" token is weight, everything else tends to be name+note
-  const isWeightTok = (tok) => {
-    if (!tok) return false;
-    if (tok.includes("kg")) return true;
-    if (/^\\d+(\\.\\d+)?$/.test(tok)) return true;
-    if (tok === "自重" || tok === "膝コロ" || tok.includes("バンド") || tok.includes("🟣")) return true;
-    return false;
-  };
-
-  let weightIdx = -1;
-  for (let i = 0; i < parts.length; i++) {
-    if (isWeightTok(parts[i])) weightIdx = i;
-  }
-
-  if (weightIdx >= 0) {
-    weight = parts[weightIdx];
-    const left = parts.slice(0, weightIdx).join(" ").trim();
-    const right = parts.slice(weightIdx + 1).join(" ").trim();
-    name = left || parts[0] || "";
-    note = right;
-  } else {
-    name = parts.join(" ").trim();
-  }
-
-  // If name still contains obvious remark-like phrases, move them to note
-  const remarkWords = ["PB更新", "PR", "自己ベスト", "更新", "ディロード", "Active", "Recovery"];
-  remarkWords.forEach(w => {
-    if (name.includes(w)) {
-      name = name.replace(w, "").trim();
-      note = [w, note].filter(Boolean).join(" ");
-    }
-  });
-
-  name = name.trim();
-  if (!name) name = "（未入力）";
-
-  return { name, weight, sets, note: note.trim() };
-}
-
-function buildExerciseStr(ex) {
-  const parts = [ex.name];
-  if (ex.weight) parts.push(ex.weight);
-  let si = ex.sets ? String(ex.sets).trim() : "";
-  if (si.startsWith("(") && si.endsWith(")") && si.length >= 2) si = si.slice(1, -1).trim();
-  if (si) parts.push(`(${si})`);
-  return parts.join(" ");
-}
-
-function normalizeLogsLocalOnly(logs) {
-  const res = [];
-  let changed = 0;
-
-  (Array.isArray(logs) ? logs : []).forEach(l => {
-    const base = { ...l };
-    const movedNotes = [];
-
-    const mainSegs = splitSlash(base.mainWorkout);
-    const subSegs  = splitSlash(base.subWorkout);
-
-    // Main exercises
-    let mainEx = mainSegs.map(normalizeExerciseSegment).filter(Boolean);
-
-    // Special case: single exercise name + weightRepSet as metrics list (e.g. "45kg / (7,6,4) / 3s")
-    const mainLooksSingle = mainSegs.length === 1 && base.mainWorkout && base.mainWorkout !== "—";
-    const wrHasMetrics = (splitSlash(base.weightRepSet).length > 0);
-    if (mainLooksSingle && wrHasMetrics) {
-      const m = parseWeightRepSetMetrics(base.weightRepSet);
-      // Only override when weightRepSet doesn't look like an exercise list with names (avoid losing multi-exercise strings)
-      const wrSegs = splitSlash(base.weightRepSet);
-      const wrSeemsJustMetrics = wrSegs.every(s => {
-        const t = s.trim();
-        if (/^\\(([^)]+)\\)$/.test(t)) return true;
-        if (t.includes("kg")) return true;
-        if (/^\\d+(\\.\\d+)?$/.test(t)) return true;
-        if (/^\\d+(\\.\\d+)?s$/i.test(t)) return true;
-        if (t === "自重" || t === "膝コロ" || t.includes("バンド") || t.includes("🟣")) return true;
-        // If it contains kanji/kana/letters, it's probably a name/note segment
-        return false;
-      });
-      if (wrSeemsJustMetrics) {
-        const cleanedName = String(base.mainWorkout).trim() || "（未入力）";
-        mainEx = [{ name: cleanedName, weight: m.weight, sets: m.sets, note: m.note }].filter(Boolean);
-      }
-    }
-
-    // If mainWorkout is not an exercise list but weightRepSet has exercise-like segments, try to derive from weightRepSet.
-    if ((!mainEx.length || !looksLikeExerciseList(base.mainWorkout)) && looksLikeExerciseList(base.weightRepSet)) {
-      const wrSegs = splitSlash(base.weightRepSet);
-      const fromWR = wrSegs.map(normalizeExerciseSegment).filter(Boolean);
-      if (fromWR.length) mainEx = fromWR;
-    }
-
-    // Sub exercises: if it doesn't look like exercises, treat as remarks
-    let subEx = [];
-    if (looksLikeExerciseList(base.subWorkout)) {
-      subEx = subSegs.map(normalizeExerciseSegment).filter(Boolean);
-    } else if ((base.subWorkout || "").trim() && base.subWorkout !== "—" && base.subWorkout !== "なし") {
-      movedNotes.push(base.subWorkout.trim());
-    }
-
-    // Collect per-exercise notes into remarks
-    [...mainEx, ...subEx].forEach(ex => {
-      if (ex.note) movedNotes.push(`${ex.name}: ${ex.note}`);
-    });
-
-    const newMainWorkout = mainEx.length ? mainEx.map(buildExerciseStr).join(" / ") : (base.mainWorkout || "—");
-    const newSubWorkout  = subEx.length ? subEx.map(buildExerciseStr).join(" / ") : "—";
-    const newWeightRepSet = mainEx.length
-      ? mainEx
-          .map(ex => [ex.weight, ex.sets ? `(${ex.sets})` : ""].filter(Boolean).join(" ").trim())
-          .filter(Boolean)
-          .join(" / ") || "—"
-      : (base.weightRepSet || "—");
-
-    const newRemarks = [base.remarks, movedNotes.join("\\n")].filter(s => (s || "").trim()).join("\\n");
-
-    const next = {
-      ...base,
-      mainWorkout: newMainWorkout || "—",
-      subWorkout: newSubWorkout || "—",
-      weightRepSet: newWeightRepSet || "—",
-      remarks: newRemarks || "",
-    };
-
-    if (
-      next.mainWorkout !== base.mainWorkout ||
-      next.subWorkout !== base.subWorkout ||
-      next.weightRepSet !== base.weightRepSet ||
-      next.remarks !== base.remarks
-    ) changed++;
-
-    res.push(next);
-  });
-
-  return { logs: res, changed };
-}
 
 /* ═══ Password Gate ═════════════════════════════════════ */
 function PasswordGate({ onAuth }) {
@@ -1511,18 +1234,11 @@ export default function App() {
   const [syncErr, setSyncErr] = useState(null);
   /** 全画面ブロックは「シードデータにリセット」実行中のみ（移行・初回同期では出さない） */
   const [seedResetBlocking, setSeedResetBlocking] = useState(false);
-  const remoteUpdatedAtRef = useRef(null); // ISO string from server
   const [tab, setTab] = useState("dashboard");
   const [updateAvailable, setUpdateAvailable] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const swRef = useRef(null);
   const [backupTick, setBackupTick] = useState(0);
-  /** v1→v2 移行が終わるまで初回リモート同期を遅らせ、空の GET でローカルを潰さない */
-  const [remoteHydrated, setRemoteHydrated] = useState(() => {
-    const s = readSession();
-    if (!s?.userId) return false;
-    return getSchemaVersion(s.userId) >= SCHEMA_VERSION_V2;
-  });
   /** 本番ホストではシード／全削除などの危険な操作を UI から隠す */
   const [isLocalhost, setIsLocalhost] = useState(false);
   useEffect(() => {
@@ -1536,12 +1252,12 @@ export default function App() {
     }
   }, []);
 
-  const sk1 = syncUserId ? storageSk1(syncUserId) : "";
+  const sk2 = syncUserId ? storageSk2(syncUserId) : "";
   const latestLocalBackup = useMemo(() => {
-    if (!sk1) return null;
+    if (!sk2) return null;
     let latestKey = null;
     let latestTs = -1;
-    const prefix = `${sk1}_backup_`;
+    const prefix = `${sk2}_backup_`
     try {
       for (let i = 0; i < localStorage.length; i++) {
         const k = localStorage.key(i);
@@ -1553,13 +1269,13 @@ export default function App() {
       }
     } catch {}
     return latestKey ? { key: latestKey, ts: latestTs } : null;
-  }, [sk1, v2, backupTick]);
+  }, [sk2, v2, backupTick]);
 
   const latestRemoteBackup = useMemo(() => {
-    if (!sk1) return null;
+    if (!sk2) return null;
     let latestKey = null;
     let latestTs = -1;
-    const prefix = `${sk1}_remote_backup_`;
+    const prefix = `${sk2}_remote_backup_`
     try {
       for (let i = 0; i < localStorage.length; i++) {
         const k = localStorage.key(i);
@@ -1571,14 +1287,13 @@ export default function App() {
       }
     } catch {}
     return latestKey ? { key: latestKey, ts: latestTs } : null;
-  }, [sk1, v2, backupTick]);
+  }, [sk2, v2, backupTick]);
 
   const handleGateAuth = ({ userId, password }) => {
     setSyncUserId(userId);
     setSyncPassword(password);
     const { state } = loadLocalV2(userId);
     setV2(state || emptyV2State(userId));
-    setRemoteHydrated(getSchemaVersion(userId) >= SCHEMA_VERSION_V2);
     setHiding(true);
     setTimeout(() => setAuthed(true), 350);
   };
@@ -1594,7 +1309,6 @@ export default function App() {
     setSyncUserId(null);
     setSyncPassword(null);
     setV2(emptyV2State(""));
-    setRemoteHydrated(false);
     setTab("dashboard");
   };
 
@@ -1608,92 +1322,6 @@ export default function App() {
     }
   };
 
-  // One-time auto migration: legacy logs -> v2 tables/state
-  useEffect(() => {
-    if (!authed || !syncUserId || !syncPassword) return;
-    const v = getSchemaVersion(syncUserId);
-    if (v >= SCHEMA_VERSION_V2) {
-      setRemoteHydrated(true);
-      return;
-    }
-
-    let cancelled = false;
-    (async () => {
-      try {
-        setSyncErr(null);
-
-        // Backup legacy local logs before migration
-        try {
-          const raw = localStorage.getItem(storageSk1(syncUserId));
-          if (raw) localStorage.setItem(`${storageSk1(syncUserId)}_backup_${Date.now()}`, raw);
-        } catch {}
-
-        // Merge legacy sources (local + server v1) then normalize
-        const { logs: localLogs } = loadLocalLogs(syncUserId);
-        let merged = Array.isArray(localLogs) ? localLogs : [];
-        try {
-          const remoteV1 = await fetchRemoteState(syncUserId, syncPassword);
-          if (Array.isArray(remoteV1?.logs)) merged = mergeLogsByDate(merged, remoteV1.logs);
-        } catch {}
-
-        const normalized = normalizeLogsLocalOnly(merged).logs;
-
-        // Convert day-by-day and push to v2
-        const byDate = new Map();
-        normalized.forEach(l => { if (l?.date) byDate.set(l.date, l); });
-        const dates = Array.from(byDate.keys()).sort();
-
-        for (const date of dates) {
-          if (cancelled) return;
-          const l = byDate.get(date);
-          const conditionScore = (l?.condition == null) ? null : Number(l.condition);
-          const note = typeof l?.remarks === "string" ? l.remarks : "";
-          const parseList = (s, category) => {
-            return splitSlash(s)
-              .map(seg => normalizeExerciseSegment(seg))
-              .filter(Boolean)
-              .map((ex, idx) => ({
-                category,
-                exerciseName: ex.name || "",
-                weight: ex.weight || "",
-                reps: ex.sets || "",
-                sets: null,
-                sortOrder: idx,
-              }))
-              .filter(it => it.exerciseName);
-          };
-          const items = [
-            ...parseList(l?.mainWorkout, "main"),
-            ...parseList(l?.subWorkout, "sub"),
-          ];
-
-          await putRemoteDayV2({
-            userId: syncUserId,
-            password: syncPassword,
-            date,
-            conditionScore,
-            note,
-            items,
-            clientLast: null,
-          });
-        }
-
-        // Pull fresh v2 snapshot and store locally
-        const remote = await fetchRemoteStateV2(syncUserId, syncPassword);
-        if (cancelled) return;
-
-        setV2(buildV2StateFromRemote(remote));
-        setSchemaVersion(syncUserId, SCHEMA_VERSION_V2);
-      } catch (e) {
-        setSyncErr(e?.message || "migration failed");
-      } finally {
-        if (!cancelled) setRemoteHydrated(true);
-      }
-    })();
-
-    return () => { cancelled = true; };
-  }, [authed, syncUserId, syncPassword]);
-
   useEffect(() => {
     if (!syncUserId) return;
     saveLocalV2(syncUserId, v2, Date.now());
@@ -1706,7 +1334,7 @@ export default function App() {
   }, [syncUserId, syncPassword]);
 
   useEffect(() => {
-    if (!authed || !remoteHydrated || !syncUserId || !syncPassword) return;
+    if (!authed || !syncUserId || !syncPassword) return;
     let cancelled = false;
     (async () => {
       setSyncErr(null);
@@ -1719,7 +1347,7 @@ export default function App() {
       }
     })();
     return () => { cancelled = true; };
-  }, [authed, remoteHydrated, syncUserId, syncPassword]);
+  }, [authed, syncUserId, syncPassword]);
 
   // v2 writes are done per-day by update handlers (no bulk push-on-change here).
 
@@ -1874,18 +1502,10 @@ export default function App() {
     }
   }, [v2, refetchRemoteV2, syncUserId, syncPassword]);
 
-  const normalizeLocalData = useCallback(() => {
-    window.alert("V2移行後は文字列ベースの正規化は不要になりました。");
-  }, []);
-
-  const normalizeServerData = useCallback(async () => {
-    window.alert("V2移行後は文字列ベースの正規化は不要になりました。");
-  }, []);
-
   const saveLocalBackupNow = useCallback(() => {
     if (!syncUserId) return;
     try {
-      const sk = storageSk1(syncUserId);
+      const sk = storageSk2(syncUserId);
       const raw = localStorage.getItem(sk);
       if (!raw) {
         window.alert("ローカルデータが見つかりませんでした。");
@@ -1913,8 +1533,6 @@ export default function App() {
     try {
       const rawV2 = localStorage.getItem(storageSk2(syncUserId));
       if (rawV2) localStorage.setItem(`${storageSk2(syncUserId)}_backup_${Date.now()}`, rawV2);
-      const rawV1 = localStorage.getItem(storageSk1(syncUserId));
-      if (rawV1) localStorage.setItem(`${storageSk1(syncUserId)}_backup_${Date.now()}`, rawV1);
     } catch {}
     (async () => {
       try {
@@ -1947,7 +1565,6 @@ export default function App() {
 
         const remote = await fetchRemoteStateV2(syncUserId, syncPassword);
         setV2(buildV2StateFromRemote(remote));
-        setSchemaVersion(syncUserId, SCHEMA_VERSION_V2);
         setBackupTick(t => t + 1);
         window.alert("シードデータにリセットしました（V2/DB反映）。");
       } catch (e) {
@@ -1968,12 +1585,8 @@ export default function App() {
     try {
       const rawV2 = localStorage.getItem(storageSk2(syncUserId));
       if (rawV2) localStorage.setItem(`${storageSk2(syncUserId)}_backup_${Date.now()}`, rawV2);
-      const rawV1 = localStorage.getItem(storageSk1(syncUserId));
-      if (rawV1) localStorage.setItem(`${storageSk1(syncUserId)}_backup_${Date.now()}`, rawV1);
     } catch {}
     setV2(emptyV2State(syncUserId));
-    setSchemaVersion(syncUserId, SCHEMA_VERSION_V2);
-    saveLocalLogs(syncUserId, [], Date.now());
     saveLocalV2(syncUserId, emptyV2State(syncUserId), Date.now());
     setBackupTick(t => t + 1);
     window.alert("データを全て削除しました（ローカルのみ / V2）。");
@@ -1981,7 +1594,7 @@ export default function App() {
 
   const restoreLatestLocalBackup = useCallback(() => {
     if (!syncUserId) return;
-    const sk = storageSk1(syncUserId);
+    const sk = storageSk2(syncUserId);
     const prefix = `${sk}_backup_`;
     let latestKey = null;
     let latestTs = -1;

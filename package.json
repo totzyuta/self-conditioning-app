@@ -4,6 +4,7 @@
   "description": "Personal fitness and conditioning tracker",
   "type": "module",
   "scripts": {
+    "build": "vite build",
     "dev": "vite",
     "dev:vite": "vite --port $PORT",
     "dev:vercel": "vercel dev",
