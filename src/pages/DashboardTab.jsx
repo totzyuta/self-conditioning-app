@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { condColor, condLabelColor } from "../lib/format.js";
+import { condLabelColor } from "../lib/format.js";
 
 export default function DashboardTab({
   v2,
@@ -16,7 +16,6 @@ export default function DashboardTab({
 
   const todayCond = v2.conditionsByDate?.[today]?.score;
   const todayCondNote = (v2.conditionsByDate?.[today]?.note || "").trim();
-  const c = condColor(todayCond != null ? todayCond : null);
   const bandLabelColor = todayCond != null ? condLabelColor(Number(todayCond)) : "#9B9890";
 
   const recentSessions = useMemo(() => {
@@ -40,7 +39,7 @@ export default function DashboardTab({
           Condition
         </div>
         <div style={{
-          fontSize: 104, fontWeight: 100, color: c,
+          fontSize: 104, fontWeight: 100, color: "var(--green)",
           lineHeight: 1, letterSpacing: "-7px",
           fontVariantNumeric: "tabular-nums",
           animation: "countUp .6s .3s cubic-bezier(.22,1,.36,1) both",
