@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { LABEL_S } from "./chartConstants.js";
-import { todayISO, condColor } from "../../lib/format.js";
+import { todayISO, condLabelColor } from "../../lib/format.js";
 
 export default function ConditionRecordScreen({ onClose, onSubmit, v2, initialDate, editDate }) {
   const [date, setDate] = useState(initialDate || todayISO());
@@ -22,7 +22,7 @@ export default function ConditionRecordScreen({ onClose, onSubmit, v2, initialDa
   }, [date, v2]);
 
   const cv = parseFloat(cond);
-  const cc = condColor(Number.isFinite(cv) ? cv : 5);
+  const cc = condLabelColor(Number.isFinite(cv) ? cv : 5);
   const pct = (Math.min(10, Math.max(0, Number.isFinite(cv) ? cv : 5)) / 10) * 100;
 
   const handleSubmit = (e) => {

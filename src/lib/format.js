@@ -30,6 +30,18 @@ export function condLabel(v) {
   return "Very high";
 }
 
+/** Tier color aligned with condLabel() — orbs, sliders, dashboard hero. */
+export function condLabelColor(v) {
+  if (v == null) return "#9B9890";
+  const n = Number(v);
+  if (!Number.isFinite(n)) return "#9B9890";
+  if (n < 3) return "#1E3A8A";
+  if (n < 4.5) return "#0891B2";
+  if (n <= 5.5) return "#15803D";
+  if (n <= 7) return "#EA580C";
+  return "#DC2626";
+}
+
 const WD_JA = ["日", "月", "火", "水", "木", "金", "土"];
 const WD_EN = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
 const MO_JA = ["1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月"];

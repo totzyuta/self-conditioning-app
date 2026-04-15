@@ -16,7 +16,6 @@ import {
 } from "./lib/v2State.js";
 import {
   asNullableScore,
-  condColor,
   condLabel,
   fmtDate,
   todayISO,
@@ -518,7 +517,6 @@ export default function App() {
             v2={v2}
             daySummaries={daySummaries}
             todayISO={todayISO}
-            condColor={condColor}
             condLabel={condLabel}
             DateHeader={DateHeader}
             OSBar={OSBar}

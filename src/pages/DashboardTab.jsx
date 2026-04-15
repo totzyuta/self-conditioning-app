@@ -1,10 +1,10 @@
 import React, { useMemo } from "react";
+import { condLabelColor } from "../lib/format.js";
 
 export default function DashboardTab({
   v2,
   daySummaries,
   todayISO,
-  condColor,
   condLabel,
   DateHeader,
   OSBar,
@@ -16,7 +16,7 @@ export default function DashboardTab({
 
   const todayCond = v2.conditionsByDate?.[today]?.score;
   const todayCondNote = (v2.conditionsByDate?.[today]?.note || "").trim();
-  const c = condColor(todayCond != null ? todayCond : null);
+  const c = todayCond != null ? condLabelColor(Number(todayCond)) : "#9B9890";
 
   const recentSessions = useMemo(() => {
     const sorted = [...summaries].sort((a, b) => new Date(b.date) - new Date(a.date));
