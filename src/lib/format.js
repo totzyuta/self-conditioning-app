@@ -15,15 +15,19 @@ export function condColor(v) {
   return "#C4613A";
 }
 
+/**
+ * 0–10 スコアの帯ラベル（5.0 がニュートラル軸）。
+ * 端は "Too low/high" ではなく Very low/high（価値判断を弱めた自己観察向けの語感）。
+ *
+ * 閾値: [0,3) [3,4.5) [4.5,5.5] (5.5,7] (7,10]
+ */
 export function condLabel(v) {
   if (v == null) return "—";
-  if (v >= 7.5) return "Excellent";
-  if (v >= 6.5) return "Very Good";
-  if (v >= 5.5) return "Good";
-  if (v >= 5.0) return "Above Neutral";
-  if (v >= 4.5) return "Neutral";
-  if (v >= 3.5) return "Below Neutral";
-  return "Low";
+  if (v < 3) return "Very low";
+  if (v < 4.5) return "Low";
+  if (v <= 5.5) return "Neutral";
+  if (v <= 7) return "High";
+  return "Very high";
 }
 
 const WD_JA = ["日", "月", "火", "水", "木", "金", "土"];
