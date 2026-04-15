@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState } from "react";
-import SmoothLineChart from "../charts/SmoothLineChart.jsx";
+import BarChart from "../charts/BarChart.jsx";
 import { PERIODS } from "../condition/chartConstants.js";
 import { fmtDate } from "../../lib/format.js";
 import { useIsMobile } from "../../hooks/useIsMobile.js";
@@ -78,12 +78,11 @@ export default function StepsChartCard({ v2, defaultPeriod = "1m", height = 140 
       <div ref={chartWrapRef}>
         {chartPoints.length >= 2 ? (
           <>
-            <SmoothLineChart
+            <BarChart
               points={chartPoints}
               w={chartW}
               h={isMobile ? Math.round(height * 1.5) : height}
               color={LINE}
-              showNeutral={false}
               showDateLabels={true}
               axisFontSize={11}
               dateFontSize={11}
