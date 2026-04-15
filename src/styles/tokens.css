@@ -3,4 +3,10 @@
   --green: #2D5A27; --green-dim: #EAF2E9;
   --terra: #C4613A; --terra-dim: #FBF0EB;
   --text: #1C1C1A; --muted: #9B9890; --border: #E4E1D8;
+  /* condLabel() 帯のみ。彩度を抑えた中間色（green/terra/muted のトーンに寄せる） */
+  --cond-band-very-low: #5A6470;
+  --cond-band-low: #6D8E99;
+  --cond-band-neutral: #6F7B68;
+  --cond-band-high: #A77752;
+  --cond-band-very-high: #9D5E4E;
 }

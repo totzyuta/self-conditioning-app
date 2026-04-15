@@ -30,16 +30,19 @@ export function condLabel(v) {
   return "Very high";
 }
 
-/** Tier color for condLabel() text only (Very low … Very high). Numbers/sliders use condColor. */
+/**
+ * Tier color for condLabel() text only (Very low … Very high).
+ * Mid-chroma tones aligned with tokens.css (--green / --terra / --muted); sliders use condColor.
+ */
 export function condLabelColor(v) {
   if (v == null) return "#9B9890";
   const n = Number(v);
   if (!Number.isFinite(n)) return "#9B9890";
-  if (n < 3) return "#1E3A8A";
-  if (n < 4.5) return "#0891B2";
-  if (n <= 5.5) return "#15803D";
-  if (n <= 7) return "#EA580C";
-  return "#DC2626";
+  if (n < 3) return "#5A6470";
+  if (n < 4.5) return "#6D8E99";
+  if (n <= 5.5) return "#6F7B68";
+  if (n <= 7) return "#A77752";
+  return "#9D5E4E";
 }
 
 const WD_JA = ["日", "月", "火", "水", "木", "金", "土"];
