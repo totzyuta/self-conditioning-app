@@ -67,10 +67,29 @@ export default function BarChart({
   const handlePointer = (e) => {
     const svg = svgRef.current;
     if (!svg) return;
-    const rect = svg.getBoundingClientRect();
-    const scaleX = w / rect.width;
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    const svgX = (clientX - rect.left) * scaleX;
+    const touch = e.touches ? e.touches[0] : null;
+    const clientX = touch ? touch.clientX : e.clientX;
+    const clientY = touch ? touch.clientY : e.clientY;
+
+    // Map client -> SVG coordinates correctly (accounts for viewBox/preserveAspectRatio).
+    let svgX;
+    try {
+      const ctm = svg.getScreenCTM?.();
+      if (ctm) {
+        const pt = svg.createSVGPoint();
+        pt.x = clientX;
+        pt.y = clientY;
+        const sp = pt.matrixTransform(ctm.inverse());
+        svgX = sp.x;
+      }
+    } catch {
+      // ignore
+    }
+    if (svgX == null) {
+      const rect = svg.getBoundingClientRect();
+      const scaleX = w / rect.width;
+      svgX = (clientX - rect.left) * scaleX;
+    }
     let best = 0;
     let bestDist = Infinity;
     bars.forEach((b, idx) => {
