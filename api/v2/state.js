@@ -95,7 +95,13 @@ export default async function handler(req, res) {
       const date = asIsoDate(body.date);
       if (!date) return json(res, 400, { ok: false, error: "Invalid body: date (YYYY-MM-DD) required" });
 
-      const conditionScore = (typeof body.conditionScore === "number" || body.conditionScore === null) ? body.conditionScore : undefined;
+      let conditionScore;
+      if (body.conditionScore === null) conditionScore = null;
+      else if (typeof body.conditionScore === "number" && Number.isFinite(body.conditionScore)) conditionScore = body.conditionScore;
+      else if (typeof body.conditionScore === "string" && body.conditionScore.trim() !== "") {
+        const n = Number(body.conditionScore);
+        if (Number.isFinite(n)) conditionScore = n;
+      }
       const note = typeof body.note === "string" ? body.note : undefined;
       const items = Array.isArray(body.items) ? body.items : undefined;
 

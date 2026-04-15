@@ -65,6 +65,12 @@ function loadSyncPw() {
   return PW;
 }
 
+function asNullableScore(value) {
+  if (value == null) return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
 async function fetchRemoteState() {
   const res = await fetch("/api/state", {
     headers: { "x-sync-password": loadSyncPw() },
@@ -493,6 +499,57 @@ function emptyV2State() {
     conditionsByDate: {}, // { [date]: { score, updatedAt } }
     trainingByDate: {}, // { [date]: { note, updatedAt, items: { main:[], sub:[] }, itemsUpdatedAtMax } }
   };
+}
+
+/** GET /api/v2/state のレスポンスをクライアント v2 状態に変換 */
+function buildV2StateFromRemote(remote) {
+  const next = emptyV2State();
+  next.userId = remote.userId || USER_ID_DEFAULT;
+  (remote.conditions || []).forEach(r => {
+    if (!r?.date) return;
+    next.conditionsByDate[r.date] = { score: r.score ?? null, updatedAt: r.updated_at || null };
+  });
+  (remote.trainingSessions || []).forEach(r => {
+    if (!r?.date) return;
+    next.trainingByDate[r.date] = {
+      note: r.note || "",
+      updatedAt: r.updated_at || null,
+      items: { main: [], sub: [] },
+      itemsUpdatedAtMax: null,
+    };
+  });
+  (remote.trainingItems || []).forEach(r => {
+    if (!r?.date) return;
+    const slot = next.trainingByDate[r.date] || {
+      note: "",
+      updatedAt: null,
+      items: { main: [], sub: [] },
+      itemsUpdatedAtMax: null,
+    };
+    const cat = r.category === "sub" ? "sub" : "main";
+    slot.items[cat].push({
+      id: r.id,
+      category: cat,
+      exerciseName: r.exercise_name || "",
+      weight: r.weight || "",
+      reps: r.reps || "",
+      sets: r.sets ?? null,
+      sortOrder: r.sort_order ?? 0,
+      updatedAt: r.updated_at || null,
+    });
+    if (r.updated_at) {
+      slot.itemsUpdatedAtMax = !slot.itemsUpdatedAtMax || Date.parse(r.updated_at) > Date.parse(slot.itemsUpdatedAtMax)
+        ? r.updated_at
+        : slot.itemsUpdatedAtMax;
+    }
+    next.trainingByDate[r.date] = slot;
+  });
+  Object.keys(next.trainingByDate).forEach(d => {
+    const t = next.trainingByDate[d];
+    t.items.main.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+    t.items.sub.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+  });
+  return next;
 }
 
 /** UI 用: V2 正規化データから日付一覧（文字列パースなし） */
@@ -1399,6 +1456,8 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const swRef = useRef(null);
   const [backupTick, setBackupTick] = useState(0);
+  /** v1→v2 移行が終わるまで初回リモート同期を遅らせ、空の GET でローカルを潰さない */
+  const [remoteHydrated, setRemoteHydrated] = useState(() => getSchemaVersion() >= SCHEMA_VERSION_V2);
   /** 本番ホストではシード／全削除などの危険な操作を UI から隠す */
   const [isLocalhost, setIsLocalhost] = useState(false);
   useEffect(() => {
@@ -1462,7 +1521,10 @@ export default function App() {
   useEffect(() => {
     if (!authed) return;
     const v = getSchemaVersion();
-    if (v >= SCHEMA_VERSION_V2) return;
+    if (v >= SCHEMA_VERSION_V2) {
+      setRemoteHydrated(true);
+      return;
+    }
 
     let cancelled = false;
     (async () => {
@@ -1528,57 +1590,12 @@ export default function App() {
         const remote = await fetchRemoteStateV2(USER_ID_DEFAULT);
         if (cancelled) return;
 
-        const next = emptyV2State();
-        next.userId = remote.userId || USER_ID_DEFAULT;
-        (remote.conditions || []).forEach(r => {
-          if (!r?.date) return;
-          next.conditionsByDate[r.date] = { score: r.score ?? null, updatedAt: r.updated_at || null };
-        });
-        (remote.trainingSessions || []).forEach(r => {
-          if (!r?.date) return;
-          next.trainingByDate[r.date] = {
-            note: r.note || "",
-            updatedAt: r.updated_at || null,
-            items: { main: [], sub: [] },
-            itemsUpdatedAtMax: null,
-          };
-        });
-        (remote.trainingItems || []).forEach(r => {
-          if (!r?.date) return;
-          const slot = next.trainingByDate[r.date] || {
-            note: "",
-            updatedAt: null,
-            items: { main: [], sub: [] },
-            itemsUpdatedAtMax: null,
-          };
-          const cat = r.category === "sub" ? "sub" : "main";
-          slot.items[cat].push({
-            id: r.id,
-            category: cat,
-            exerciseName: r.exercise_name || "",
-            weight: r.weight || "",
-            reps: r.reps || "",
-            sets: r.sets ?? null,
-            sortOrder: r.sort_order ?? 0,
-            updatedAt: r.updated_at || null,
-          });
-          if (r.updated_at) {
-            slot.itemsUpdatedAtMax = !slot.itemsUpdatedAtMax || Date.parse(r.updated_at) > Date.parse(slot.itemsUpdatedAtMax)
-              ? r.updated_at
-              : slot.itemsUpdatedAtMax;
-          }
-          next.trainingByDate[r.date] = slot;
-        });
-        Object.keys(next.trainingByDate).forEach(d => {
-          const t = next.trainingByDate[d];
-          t.items.main.sort((a,b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
-          t.items.sub.sort((a,b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
-        });
-
-        setV2(next);
+        setV2(buildV2StateFromRemote(remote));
         setSchemaVersion(SCHEMA_VERSION_V2);
       } catch (e) {
         setSyncErr(e?.message || "migration failed");
+      } finally {
+        if (!cancelled) setRemoteHydrated(true);
       }
     })();
 
@@ -1589,71 +1606,26 @@ export default function App() {
     saveLocalV2(v2, Date.now());
   }, [v2]);
 
+  const refetchRemoteV2 = useCallback(async () => {
+    const remote = await fetchRemoteStateV2(USER_ID_DEFAULT);
+    setV2(buildV2StateFromRemote(remote));
+  }, []);
+
   useEffect(() => {
+    if (!authed || !remoteHydrated) return;
     let cancelled = false;
     (async () => {
       setSyncErr(null);
       try {
-        // Prefer v2 state sync
         const remote = await fetchRemoteStateV2(USER_ID_DEFAULT);
         if (cancelled) return;
-
-        const next = emptyV2State();
-        next.userId = remote.userId || USER_ID_DEFAULT;
-        (remote.conditions || []).forEach(r => {
-          if (!r?.date) return;
-          next.conditionsByDate[r.date] = { score: r.score ?? null, updatedAt: r.updated_at || null };
-        });
-        (remote.trainingSessions || []).forEach(r => {
-          if (!r?.date) return;
-          next.trainingByDate[r.date] = {
-            note: r.note || "",
-            updatedAt: r.updated_at || null,
-            items: { main: [], sub: [] },
-            itemsUpdatedAtMax: null,
-          };
-        });
-        (remote.trainingItems || []).forEach(r => {
-          if (!r?.date) return;
-          const slot = next.trainingByDate[r.date] || {
-            note: "",
-            updatedAt: null,
-            items: { main: [], sub: [] },
-            itemsUpdatedAtMax: null,
-          };
-          const cat = r.category === "sub" ? "sub" : "main";
-          slot.items[cat].push({
-            id: r.id,
-            category: cat,
-            exerciseName: r.exercise_name || "",
-            weight: r.weight || "",
-            reps: r.reps || "",
-            sets: r.sets ?? null,
-            sortOrder: r.sort_order ?? 0,
-            updatedAt: r.updated_at || null,
-          });
-          if (r.updated_at) {
-            slot.itemsUpdatedAtMax = !slot.itemsUpdatedAtMax || Date.parse(r.updated_at) > Date.parse(slot.itemsUpdatedAtMax)
-              ? r.updated_at
-              : slot.itemsUpdatedAtMax;
-          }
-          next.trainingByDate[r.date] = slot;
-        });
-
-        // Sort items per day
-        Object.keys(next.trainingByDate).forEach(d => {
-          const t = next.trainingByDate[d];
-          t.items.main.sort((a,b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
-          t.items.sub.sort((a,b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
-        });
-
-        setV2(next);
+        setV2(buildV2StateFromRemote(remote));
       } catch (e) {
         if (!cancelled) setSyncErr(e?.message || "sync failed");
       }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [authed, remoteHydrated]);
 
   // v2 writes are done per-day by update handlers (no bulk push-on-change here).
 
@@ -1697,21 +1669,25 @@ export default function App() {
             trainingItemsUpdatedAtMax: v2.trainingByDate?.[date]?.itemsUpdatedAtMax || null,
           },
         });
+        setSyncErr(null);
+        setV2(prev => {
+          const next = { ...prev };
+          next.trainingByDate = { ...(prev.trainingByDate || {}) };
+          next.trainingByDate[date] = {
+            note: "",
+            updatedAt: new Date().toISOString(),
+            items: { main: [], sub: [] },
+            itemsUpdatedAtMax: new Date().toISOString(),
+          };
+          return next;
+        });
       } catch (e) {
-        setSyncErr(e?.message || "sync failed");
+        const msg = e?.code === 409 ? "サーバー側が先に更新されています。再同期しました。" : (e?.message || "sync failed");
+        setSyncErr(msg);
+        if (e?.code === 409) {
+          try { await refetchRemoteV2(); } catch (_) {}
+        }
       }
-
-      setV2(prev => {
-        const next = { ...prev };
-        next.trainingByDate = { ...(prev.trainingByDate || {}) };
-        next.trainingByDate[date] = {
-          note: "",
-          updatedAt: new Date().toISOString(),
-          items: { main: [], sub: [] },
-          itemsUpdatedAtMax: new Date().toISOString(),
-        };
-        return next;
-      });
       setTab("training");
       return;
     }
@@ -1738,32 +1714,35 @@ export default function App() {
         },
       });
       setSyncErr(null);
+      setV2(prev => {
+        const next = { ...prev };
+        next.conditionsByDate = { ...(prev.conditionsByDate || {}) };
+        next.trainingByDate = { ...(prev.trainingByDate || {}) };
+        next.conditionsByDate[date] = { score: conditionScore, updatedAt: new Date().toISOString() };
+
+        const mainItems = items.filter(it => it.category === "main").map(it => ({ ...it, id: `local_${date}_m_${it.sortOrder}` }));
+        const subItems = items.filter(it => it.category === "sub").map(it => ({ ...it, id: `local_${date}_s_${it.sortOrder}` }));
+        next.trainingByDate[date] = {
+          note,
+          updatedAt: new Date().toISOString(),
+          items: { main: mainItems, sub: subItems },
+          itemsUpdatedAtMax: new Date().toISOString(),
+        };
+        return next;
+      });
     } catch (e) {
-      setSyncErr(e?.message || "sync failed");
+      const msg = e?.code === 409 ? "サーバー側が先に更新されています。再同期しました。" : (e?.message || "sync failed");
+      setSyncErr(msg);
+      if (e?.code === 409) {
+        try { await refetchRemoteV2(); } catch (_) {}
+      }
     }
 
-    setV2(prev => {
-      const next = { ...prev };
-      next.conditionsByDate = { ...(prev.conditionsByDate || {}) };
-      next.trainingByDate = { ...(prev.trainingByDate || {}) };
-      next.conditionsByDate[date] = { score: conditionScore, updatedAt: new Date().toISOString() };
-
-      const mainItems = items.filter(it => it.category === "main").map(it => ({ ...it, id: `local_${date}_m_${it.sortOrder}` }));
-      const subItems = items.filter(it => it.category === "sub").map(it => ({ ...it, id: `local_${date}_s_${it.sortOrder}` }));
-      next.trainingByDate[date] = {
-        note,
-        updatedAt: new Date().toISOString(),
-        items: { main: mainItems, sub: subItems },
-        itemsUpdatedAtMax: new Date().toISOString(),
-      };
-      return next;
-    });
-
     setTab("training");
-  }, [v2]);
+  }, [v2, refetchRemoteV2]);
 
   const updateCondition = useCallback(async (date, value) => {
-    const conditionScore = value == null ? null : Number(value);
+    const conditionScore = asNullableScore(value);
     const note = v2.trainingByDate?.[date]?.note || "";
     const items = [
       ...(v2.trainingByDate?.[date]?.items?.main || []).map(it => ({ ...it, category: "main" })),
@@ -1783,16 +1762,20 @@ export default function App() {
         },
       });
       setSyncErr(null);
+      setV2(prev => {
+        const next = { ...prev };
+        next.conditionsByDate = { ...(prev.conditionsByDate || {}) };
+        next.conditionsByDate[date] = { score: conditionScore, updatedAt: new Date().toISOString() };
+        return next;
+      });
     } catch (e) {
-      setSyncErr(e?.message || "sync failed");
+      const msg = e?.code === 409 ? "サーバー側が先に更新されています。再同期しました。" : (e?.message || "sync failed");
+      setSyncErr(msg);
+      if (e?.code === 409) {
+        try { await refetchRemoteV2(); } catch (_) {}
+      }
     }
-    setV2(prev => {
-      const next = { ...prev };
-      next.conditionsByDate = { ...(prev.conditionsByDate || {}) };
-      next.conditionsByDate[date] = { score: conditionScore, updatedAt: new Date().toISOString() };
-      return next;
-    });
-  }, [v2]);
+  }, [v2, refetchRemoteV2]);
 
   const normalizeLocalData = useCallback(() => {
     window.alert("V2移行後は文字列ベースの正規化は不要になりました。");
