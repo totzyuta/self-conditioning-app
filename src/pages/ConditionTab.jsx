@@ -3,7 +3,6 @@ import CondOrb from "../components/condition/CondOrb.jsx";
 
 export default function ConditionTab({
   v2,
-  onUpdateCondition,
   onSaveConditionDay,
   todayISO,
   fmtDate,
@@ -108,8 +107,7 @@ export default function ConditionTab({
           v2={v2}
           defaultPeriod="1m"
           height={140}
-          showRecord={true}
-          onUpdateCondition={onUpdateCondition}
+          showRecord={false}
         />
       </div>
 

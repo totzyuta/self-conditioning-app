@@ -289,41 +289,6 @@ export default function App() {
     setTab("training");
   }, [v2, refetchRemoteV2, syncUserId, syncPassword]);
 
-  const updateCondition = useCallback(async (date, value) => {
-    const conditionScore = asNullableScore(value);
-    try {
-      await putRemoteDayV2({
-        userId: syncUserId,
-        password: syncPassword,
-        date,
-        conditionScore,
-        clientLast: {
-          conditionsUpdatedAt: v2.conditionsByDate?.[date]?.updatedAt || null,
-          trainingSessionUpdatedAt: v2.trainingByDate?.[date]?.updatedAt || null,
-          trainingItemsUpdatedAtMax: v2.trainingByDate?.[date]?.itemsUpdatedAtMax || null,
-        },
-      });
-      setSyncErr(null);
-      setV2(prev => {
-        const next = { ...prev };
-        next.conditionsByDate = { ...(prev.conditionsByDate || {}) };
-        const prevRow = prev.conditionsByDate?.[date];
-        next.conditionsByDate[date] = {
-          score: conditionScore,
-          note: prevRow?.note ?? "",
-          updatedAt: new Date().toISOString(),
-        };
-        return next;
-      });
-    } catch (e) {
-      const msg = e?.code === 409 ? "サーバー側が先に更新されています。再同期しました。" : (e?.message || "sync failed");
-      setSyncErr(msg);
-      if (e?.code === 409) {
-        try { await refetchRemoteV2(); } catch (_) {}
-      }
-    }
-  }, [v2, refetchRemoteV2, syncUserId, syncPassword]);
-
   const saveConditionDay = useCallback(async ({ date, conditionScore, conditionNote }) => {
     const score = asNullableScore(conditionScore);
     const cn = typeof conditionNote === "string" ? conditionNote : "";
@@ -565,7 +530,6 @@ export default function App() {
           <ConditionTabPage
             key="cond"
             v2={v2}
-            onUpdateCondition={updateCondition}
             onSaveConditionDay={saveConditionDay}
             todayISO={todayISO}
             fmtDate={fmtDate}
