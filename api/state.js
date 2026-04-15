@@ -42,7 +42,7 @@ export default async function handler(req, res) {
         .from("app_state")
         .select("logs_json, updated_at")
         .eq("id", stateId)
-        .single();
+        .maybeSingle();
       if (error) return json(res, 500, { ok: false, error: error.message });
 
       return json(res, 200, {
@@ -66,21 +66,23 @@ export default async function handler(req, res) {
           .from("app_state")
           .select("logs_json, updated_at")
           .eq("id", stateId)
-          .single();
+          .maybeSingle();
         if (curErr) return json(res, 500, { ok: false, error: curErr.message });
-        const serverMs = cur?.updated_at ? Date.parse(cur.updated_at) : 0;
-        const clientMs = Date.parse(String(clientLast));
-        if (Number.isFinite(clientMs) && serverMs && serverMs > clientMs) {
-          return json(res, 409, {
-            ok: false,
-            error: "Conflict",
-            conflict: true,
-            server: {
-              id: stateId,
-              logs: cur?.logs_json ?? [],
-              updatedAt: cur?.updated_at ?? null,
-            },
-          });
+        if (cur) {
+          const serverMs = cur.updated_at ? Date.parse(cur.updated_at) : 0;
+          const clientMs = Date.parse(String(clientLast));
+          if (Number.isFinite(clientMs) && serverMs && serverMs > clientMs) {
+            return json(res, 409, {
+              ok: false,
+              error: "Conflict",
+              conflict: true,
+              server: {
+                id: stateId,
+                logs: cur.logs_json ?? [],
+                updatedAt: cur.updated_at ?? null,
+              },
+            });
+          }
         }
       }
 

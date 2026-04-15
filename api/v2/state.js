@@ -18,6 +18,12 @@ function getSupabase() {
   return createClient(url, key, { auth: { persistSession: false } });
 }
 
+/** FK: conditions / training_* reference public.users(id). Ensure row exists (idempotent). */
+async function ensurePublicUser(supabase, userId) {
+  const { error } = await supabase.from("users").upsert({ id: userId }, { onConflict: "id" });
+  return error;
+}
+
 function asIsoDate(s) {
   const t = String(s || "").trim();
   if (!/^\d{4}-\d{2}-\d{2}$/.test(t)) return null;
@@ -40,6 +46,9 @@ export default async function handler(req, res) {
   try {
     const supabase = getSupabase();
     const userId = auth.userId;
+
+    const userErr = await ensurePublicUser(supabase, userId);
+    if (userErr) return json(res, 500, { ok: false, error: userErr.message });
 
     if (req.method === "DELETE") {
       const delItems = await supabase.from("training_items").delete().eq("user_id", userId);

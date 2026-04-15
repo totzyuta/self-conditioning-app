@@ -1583,6 +1583,21 @@ export default function App() {
     setTimeout(() => setAuthed(true), 350);
   };
 
+  const handleLogout = () => {
+    try {
+      localStorage.removeItem(SESSION_KEY);
+    } catch {}
+    setShowSettings(false);
+    setSyncErr(null);
+    setAuthed(false);
+    setHiding(false);
+    setSyncUserId(null);
+    setSyncPassword(null);
+    setV2(emptyV2State(""));
+    setRemoteHydrated(false);
+    setTab("dashboard");
+  };
+
   const handleForceUpdate = () => {
     console.log("[App] Force update triggered");
     if (swRef.current) {
@@ -2315,6 +2330,30 @@ export default function App() {
                     </button>
                   </>
                 )}
+              </div>
+
+              <div style={{ paddingTop: 16, borderTop: "1px solid var(--border)" }}>
+                <div style={{ fontSize: 11, color: "var(--muted)", letterSpacing: ".06em", marginBottom: 10 }}>
+                  アカウント
+                </div>
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  style={{
+                    width: "100%",
+                    padding: "12px",
+                    background: "none",
+                    color: "var(--text)",
+                    border: "1px solid var(--border)",
+                    borderRadius: 7,
+                    fontSize: 12,
+                    fontWeight: 700,
+                    letterSpacing: ".04em",
+                    cursor: "pointer",
+                  }}
+                >
+                  ログアウト
+                </button>
               </div>
 
               <div style={{ padding: "16px 0", borderTop: "1px solid var(--border)" }}>
