@@ -65,7 +65,7 @@ export function condLabelColor(v) {
   const n = Number(v);
   if (!Number.isFinite(n)) return "#9B9890";
   if (n < 3) return "#5A6470";
-  if (n < 4.5) return "#6D8E99";
+  if (n < 4.5) return "#6E8AA3";
   if (n <= 5.5) return "#6F7B68";
   if (n <= 7) return "#A77752";
   return "#9D5E4E";
