@@ -2,8 +2,11 @@ import React, { useEffect, useMemo, useState } from "react";
 import { fmtDate, todayISO } from "../lib/format.js";
 import WeightChartCard from "../components/weight/WeightChartCard.jsx";
 import WeightRecordScreen from "../components/weight/WeightRecordScreen.jsx";
+import { useIsMobile } from "../hooks/useIsMobile.js";
+import MobileFab from "../components/ui/MobileFab.jsx";
 
 export default function WeightTab({ v2, onSaveWeightDay }) {
+  const isMobile = useIsMobile(520);
   const [openRec, setOpenRec] = useState(false);
   const [editDate, setEditDate] = useState(null);
   const [initialDate, setInitialDate] = useState(todayISO());
@@ -82,18 +85,20 @@ export default function WeightTab({ v2, onSaveWeightDay }) {
         <h2 style={{ fontSize: 13, fontWeight: 600, letterSpacing: ".05em" }}>体重</h2>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <span style={{ fontSize: 11, color: "var(--muted)" }}>{filtered.length} entries</span>
-          <button
-            type="button"
-            onClick={() => { setEditDate(null); setInitialDate(todayISO()); setOpenRec(true); }}
-            style={{
-              background: "var(--terra)", color: "#fff", border: "none",
-              padding: "8px 12px", borderRadius: 9, fontSize: 11, fontWeight: 700,
-              letterSpacing: ".06em", boxShadow: "0 3px 14px rgba(196,97,58,.22)",
-            }}
-            title="体重を記録"
-          >
-            記録する
-          </button>
+          {!isMobile && (
+            <button
+              type="button"
+              onClick={() => { setEditDate(null); setInitialDate(todayISO()); setOpenRec(true); }}
+              style={{
+                background: "var(--terra)", color: "#fff", border: "none",
+                padding: "8px 12px", borderRadius: 9, fontSize: 11, fontWeight: 700,
+                letterSpacing: ".06em", boxShadow: "0 3px 14px rgba(196,97,58,.22)",
+              }}
+              title="体重を記録"
+            >
+              記録する
+            </button>
+          )}
         </div>
       </div>
 
@@ -221,6 +226,12 @@ export default function WeightTab({ v2, onSaveWeightDay }) {
           </tbody>
         </table>
       </div>
+
+      <MobileFab
+        hidden={!isMobile}
+        onClick={() => { setEditDate(null); setInitialDate(todayISO()); setOpenRec(true); }}
+        title="体重を記録"
+      />
     </div>
   );
 }
