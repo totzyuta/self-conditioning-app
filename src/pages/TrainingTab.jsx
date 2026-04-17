@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { formatExerciseLine, formatRepsForDisplay } from "../lib/format.js";
 import { addCalendarMonths, clampMonth } from "../lib/stepsDisplay.js";
+import { useIsMobile } from "../hooks/useIsMobile.js";
+import MobileFab from "../components/ui/MobileFab.jsx";
 
 const FILTERS = [
   { key: "all", label: "全て" },
@@ -17,6 +19,7 @@ export default function TrainingTab({
   CondOrb,
   TrainingRecordScreen,
 }) {
+  const isMobile = useIsMobile(520);
   const [filter, setFilter] = useState("all");
   const [expanded, setExpanded] = useState(new Set());
   const [openRec, setOpenRec] = useState(false);
@@ -102,17 +105,19 @@ export default function TrainingTab({
         <h2 style={{ fontSize: 13, fontWeight: 600, letterSpacing: ".05em" }}>トレーニング</h2>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <span style={{ fontSize: 11, color: "var(--muted)" }}>{filtered.length} entries</span>
-          <button
-            onClick={() => { setEditDate(null); setInitialDate(todayISO()); setOpenRec(true); }}
-            style={{
-              background: "var(--terra)", color: "#fff", border: "none",
-              padding: "8px 12px", borderRadius: 9, fontSize: 11, fontWeight: 700,
-              letterSpacing: ".06em", boxShadow: "0 3px 14px rgba(196,97,58,.22)",
-            }}
-            title="トレーニングを記録"
-          >
-            記録する
-          </button>
+          {!isMobile && (
+            <button
+              onClick={() => { setEditDate(null); setInitialDate(todayISO()); setOpenRec(true); }}
+              style={{
+                background: "var(--terra)", color: "#fff", border: "none",
+                padding: "8px 12px", borderRadius: 9, fontSize: 11, fontWeight: 700,
+                letterSpacing: ".06em", boxShadow: "0 3px 14px rgba(196,97,58,.22)",
+              }}
+              title="トレーニングを記録"
+            >
+              記録する
+            </button>
+          )}
         </div>
       </div>
 
@@ -312,6 +317,12 @@ export default function TrainingTab({
           </tbody>
         </table>
       </div>
+
+      <MobileFab
+        hidden={!isMobile}
+        onClick={() => { setEditDate(null); setInitialDate(todayISO()); setOpenRec(true); }}
+        title="トレーニングを記録"
+      />
     </div>
   );
 }

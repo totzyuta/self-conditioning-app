@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import CondOrb from "../components/condition/CondOrb.jsx";
 import { addCalendarMonths, clampMonth } from "../lib/stepsDisplay.js";
+import { useIsMobile } from "../hooks/useIsMobile.js";
+import MobileFab from "../components/ui/MobileFab.jsx";
 
 export default function ConditionTab({
   v2,
@@ -11,6 +13,7 @@ export default function ConditionTab({
   ConditionRecordScreen,
   hideTopChart = false,
 }) {
+  const isMobile = useIsMobile(520);
   const [openRec, setOpenRec] = useState(false);
   const [editDate, setEditDate] = useState(null);
   const [initialDate, setInitialDate] = useState(todayISO());
@@ -68,18 +71,20 @@ export default function ConditionTab({
         <h2 style={{ fontSize: 13, fontWeight: 600, letterSpacing: ".05em" }}>コンディション</h2>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <span style={{ fontSize: 11, color: "var(--muted)" }}>{filtered.length} entries</span>
-          <button
-            type="button"
-            onClick={() => { setEditDate(null); setInitialDate(todayISO()); setOpenRec(true); }}
-            style={{
-              background: "var(--terra)", color: "#fff", border: "none",
-              padding: "8px 12px", borderRadius: 9, fontSize: 11, fontWeight: 700,
-              letterSpacing: ".06em", boxShadow: "0 3px 14px rgba(196,97,58,.22)",
-            }}
-            title="コンディションを記録"
-          >
-            記録する
-          </button>
+          {!isMobile && (
+            <button
+              type="button"
+              onClick={() => { setEditDate(null); setInitialDate(todayISO()); setOpenRec(true); }}
+              style={{
+                background: "var(--terra)", color: "#fff", border: "none",
+                padding: "8px 12px", borderRadius: 9, fontSize: 11, fontWeight: 700,
+                letterSpacing: ".06em", boxShadow: "0 3px 14px rgba(196,97,58,.22)",
+              }}
+              title="コンディションを記録"
+            >
+              記録する
+            </button>
+          )}
         </div>
       </div>
 
@@ -235,6 +240,12 @@ export default function ConditionTab({
           </tbody>
         </table>
       </div>
+
+      <MobileFab
+        hidden={!isMobile}
+        onClick={() => { setEditDate(null); setInitialDate(todayISO()); setOpenRec(true); }}
+        title="コンディションを記録"
+      />
     </div>
   );
 }
