@@ -1,9 +1,10 @@
 import React from "react";
+import { createPortal } from "react-dom";
 import { BOTTOM_NAV_TOTAL_PX } from "../layout/BottomNav.jsx";
 
 export default function MobileFab({ onClick, title = "記録する", label = "+", hidden = false }) {
   if (hidden) return null;
-  return (
+  const node = (
     <div
       style={{
         position: "fixed",
@@ -50,5 +51,12 @@ export default function MobileFab({ onClick, title = "記録する", label = "+"
       </div>
     </div>
   );
+
+  // `fade-up` animation uses transform; on iOS Safari a transformed ancestor can
+  // break `position: fixed`. Portaling to body ensures viewport-fixed behavior.
+  if (typeof document !== "undefined" && document.body) {
+    return createPortal(node, document.body);
+  }
+  return node;
 }
 
