@@ -1,7 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { formatExerciseLine, formatRepsForDisplay } from "../lib/format.js";
+import { addCalendarMonths, clampMonth } from "../lib/stepsDisplay.js";
 import { useIsMobile } from "../hooks/useIsMobile.js";
 import MobileFab from "../components/ui/MobileFab.jsx";
+import TrainingMonthCalendar from "../components/training/TrainingMonthCalendar.jsx";
 
 const FILTERS = [
   { key: "all", label: "全て" },
@@ -20,12 +22,11 @@ export default function TrainingTab({
 }) {
   const isMobile = useIsMobile(520);
   const [filter, setFilter] = useState("all");
-  const [monthFilter, setMonthFilter] = useState("all");
   const [expanded, setExpanded] = useState(new Set());
   const [openRec, setOpenRec] = useState(false);
   const [editDate, setEditDate] = useState(null);
   const [initialDate, setInitialDate] = useState(todayISO());
-  const [selectedMonth, setSelectedMonth] = useState(() => todayISO().slice(0, 7));
+  const maxMonth = todayISO().slice(0, 7);
 
   const today = todayISO();
 
@@ -61,41 +62,24 @@ export default function TrainingTab({
     return dates.reverse();
   }, [daySummaries, summaryByDate, today, v2.conditionsByDate]);
 
-  const availableMonths = useMemo(() => {
-    const seen = new Set();
-    const months = [];
-    allDates.forEach(l => {
-      const ym = l.date.slice(0, 7);
-      if (!seen.has(ym)) {
-        seen.add(ym);
-        const [y, m] = ym.split("-");
-        months.push({ key: ym, label: `${y}年${parseInt(m, 10)}月` });
-      }
-    });
-    return months;
-  }, [allDates]);
-
-  const minMonth = availableMonths.length ? availableMonths[availableMonths.length - 1].key : undefined;
-  const maxMonth = availableMonths.length ? availableMonths[0].key : undefined;
+  const minMonth = useMemo(() => {
+    if (!allDates.length) return maxMonth;
+    return allDates[allDates.length - 1].date.slice(0, 7);
+  }, [allDates, maxMonth]);
+  const [viewMonth, setViewMonth] = useState(() => maxMonth);
 
   useEffect(() => {
-    if (!minMonth || !maxMonth) return;
-    setSelectedMonth(prev => {
-      if (!prev) return maxMonth;
-      if (prev < minMonth) return minMonth;
-      if (prev > maxMonth) return maxMonth;
-      return prev;
-    });
+    setViewMonth((prev) => clampMonth(prev, minMonth, maxMonth));
   }, [minMonth, maxMonth]);
 
   const filtered = useMemo(() => {
     return allDates.filter(l => {
-      if (monthFilter !== "all" && !l.date.startsWith(monthFilter)) return false;
+      if (!l.date.startsWith(viewMonth)) return false;
       if (filter === "training") return l.type === "training";
       if (filter === "rest") return l.type === "rest";
       return true;
     });
-  }, [allDates, filter, monthFilter]);
+  }, [allDates, filter, viewMonth]);
 
   const toggle = id => setExpanded(prev => {
     const n = new Set(prev);
@@ -138,53 +122,87 @@ export default function TrainingTab({
         </div>
       </div>
 
-      <div style={{ display: "flex", gap: 10, padding: "14px 24px 0", alignItems: "center" }}>
+      <div style={{ display: "flex", gap: 8, padding: "14px 24px 0", alignItems: "center", flexWrap: "wrap" }}>
         <button
-          onClick={() => setMonthFilter("all")}
+          type="button"
+          disabled={viewMonth <= minMonth}
+          onClick={() => {
+            if (viewMonth <= minMonth) return;
+            setViewMonth((prev) => clampMonth(addCalendarMonths(prev, -1), minMonth, maxMonth));
+          }}
+          aria-label="前の月"
           style={{
-            background: monthFilter === "all" ? "var(--terra)" : "none",
-            color: monthFilter === "all" ? "#fff" : "var(--muted)",
-            border: "1px solid",
-            borderColor: monthFilter === "all" ? "var(--terra)" : "var(--border)",
-            borderRadius: 100,
-            padding: "4px 12px",
-            fontSize: 10,
+            background: viewMonth > minMonth ? "var(--surface)" : "transparent",
+            color: viewMonth > minMonth ? "var(--text)" : "var(--muted)",
+            border: "1px solid var(--border)",
+            borderRadius: 8,
+            padding: "6px 11px",
+            fontSize: 12,
             fontWeight: 700,
-            whiteSpace: "nowrap",
-            transition: "all .15s",
+            cursor: viewMonth > minMonth ? "pointer" : "not-allowed",
+            opacity: viewMonth > minMonth ? 1 : 0.45,
           }}
         >
-          全期間
+          ←
         </button>
-
-        <div style={{ display: "flex" }}>
-          <input
-            type="month"
-            value={monthFilter === "all" ? selectedMonth : monthFilter}
-            min={minMonth}
-            max={maxMonth}
-            onChange={(e) => {
-              const v = e.target.value;
-              if (!v) return;
-              setSelectedMonth(v);
-              setMonthFilter(v);
-            }}
-            style={{
-              width: 150,
-              padding: "5px 12px",
-              borderRadius: 100,
-              border: "1px solid var(--border)",
-              background: "var(--bg)",
-              color: "var(--muted)",
-              fontSize: 11,
-              fontWeight: 600,
-              letterSpacing: ".02em",
-              outline: "none",
-            }}
-            title="年月で絞り込み"
-          />
-        </div>
+        <input
+          type="month"
+          value={viewMonth}
+          min={minMonth}
+          max={maxMonth}
+          onChange={(e) => {
+            const v = e.target.value;
+            if (!v) return;
+            setViewMonth(clampMonth(v, minMonth, maxMonth));
+          }}
+          style={{
+            width: 150,
+            padding: "5px 12px",
+            borderRadius: 100,
+            border: "1px solid var(--border)",
+            background: "var(--bg)",
+            color: "var(--muted)",
+            fontSize: 11,
+            fontWeight: 600,
+            letterSpacing: ".02em",
+            outline: "none",
+          }}
+          title="表示する月"
+        />
+        <button
+          type="button"
+          disabled={viewMonth >= maxMonth}
+          onClick={() => {
+            if (viewMonth >= maxMonth) return;
+            setViewMonth((prev) => clampMonth(addCalendarMonths(prev, 1), minMonth, maxMonth));
+          }}
+          aria-label="次の月"
+          style={{
+            background: viewMonth < maxMonth ? "var(--surface)" : "transparent",
+            color: viewMonth < maxMonth ? "var(--text)" : "var(--muted)",
+            border: "1px solid var(--border)",
+            borderRadius: 8,
+            padding: "6px 11px",
+            fontSize: 12,
+            fontWeight: 700,
+            cursor: viewMonth < maxMonth ? "pointer" : "not-allowed",
+            opacity: viewMonth < maxMonth ? 1 : 0.45,
+          }}
+        >
+          →
+        </button>
       </div>
+
+      <TrainingMonthCalendar
+        ym={viewMonth}
+        todayIso={today}
+        summaryByDate={summaryByDate}
+        onSelectDate={(ds) => {
+          setEditDate(ds);
+          setInitialDate(ds);
+          setOpenRec(true);
+        }}
+      />
 
       <div style={{ display: "flex", gap: 6, padding: "10px 24px", overflowX: "auto" }}>
         {FILTERS.map(f => (
