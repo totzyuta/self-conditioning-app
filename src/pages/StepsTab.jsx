@@ -141,7 +141,6 @@ export default function StepsTab({ v2, onSaveStepsDay }) {
           }}
           title="表示する月"
         />
-        <span style={{ fontSize: 11, color: "var(--muted)", fontWeight: 600 }}>{monthLabel(viewMonth)}</span>
         <button
           type="button"
           disabled={!canNext}
