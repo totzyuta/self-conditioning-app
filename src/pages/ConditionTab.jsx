@@ -13,6 +13,7 @@ export default function ConditionTab({
   ConditionChartCard,
   ConditionRecordScreen,
   hideTopChart = false,
+  embedded = false,
 }) {
   const isMobile = useIsMobile(520);
   const [openRec, setOpenRec] = useState(false);
@@ -51,6 +52,25 @@ export default function ConditionTab({
   });
 
   if (openRec) {
+    const rec = (
+      <ConditionRecordScreen
+        v2={v2}
+        onClose={() => { setOpenRec(false); setEditDate(null); }}
+        onSubmit={(payload) => {
+          onSaveConditionDay(payload);
+          setOpenRec(false);
+          setEditDate(null);
+        }}
+        initialDate={initialDate}
+        editDate={editDate}
+      />
+    );
+
+    // When embedded inside KokoroTab, show as a full-screen overlay so it
+    // doesn't look like an inline expansion. Otherwise, behave like other tabs
+    // (header/nav remain visible).
+    if (!embedded) return rec;
+
     const node = (
       <div
         style={{
@@ -62,24 +82,10 @@ export default function ConditionTab({
           WebkitOverflowScrolling: "touch",
         }}
       >
-        <ConditionRecordScreen
-          v2={v2}
-          onClose={() => { setOpenRec(false); setEditDate(null); }}
-          onSubmit={(payload) => {
-            onSaveConditionDay(payload);
-            setOpenRec(false);
-            setEditDate(null);
-          }}
-          initialDate={initialDate}
-          editDate={editDate}
-        />
+        {rec}
       </div>
     );
-    // This tab is also embedded inside KokoroTab; portal to body so the record
-    // screen behaves like other tabs (full-screen) instead of expanding inline.
-    if (typeof document !== "undefined" && document.body) {
-      return createPortal(node, document.body);
-    }
+    if (typeof document !== "undefined" && document.body) return createPortal(node, document.body);
     return node;
   }
 
