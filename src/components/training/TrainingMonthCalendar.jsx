@@ -24,11 +24,11 @@ export default function TrainingMonthCalendar({ ym, todayIso, summaryByDate, onS
     for (let i = 0; i < pad; i++) cells.push(null);
     for (let d = 1; d <= dim; d++) {
       const ds = `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-      if (ds > todayIso) break;
       const s = summaryByDate?.[ds] || null;
       cells.push({
         ds,
         day: d,
+        isFuture: ds > todayIso,
         hasTraining: s?.type === "training",
       });
     }
@@ -50,20 +50,23 @@ export default function TrainingMonthCalendar({ ym, todayIso, summaryByDate, onS
           {grid.map((c, idx) => {
             if (!c) return <div key={`e_${idx}`} />;
             const active = c.hasTraining;
+            const disabled = c.isFuture;
             return (
               <button
                 key={c.ds}
                 type="button"
-                onClick={() => onSelectDate(c.ds)}
+                disabled={disabled}
+                onClick={() => !disabled && onSelectDate(c.ds)}
                 style={{
                   background: active ? "rgba(45,90,39,.10)" : "var(--bg)",
                   border: `1px solid ${active ? "rgba(45,90,39,.25)" : "var(--border)"}`,
                   borderRadius: 10,
                   padding: "8px 0 7px",
-                  cursor: "pointer",
+                  cursor: disabled ? "not-allowed" : "pointer",
                   userSelect: "none",
+                  opacity: disabled ? 0.45 : 1,
                 }}
-                title={active ? "トレーニング記録あり" : "未記録"}
+                title={disabled ? "未来の日付" : (active ? "トレーニング記録あり" : "未記録")}
               >
                 <div style={{ fontSize: 12, fontWeight: 800, color: active ? "var(--green)" : "var(--text)", fontVariantNumeric: "tabular-nums" }}>
                   {c.day}
