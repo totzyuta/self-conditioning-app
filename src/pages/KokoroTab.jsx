@@ -65,6 +65,7 @@ export default function KokoroTab({
           ConditionChartCard={ConditionChartCard}
           ConditionRecordScreen={ConditionRecordScreen}
           hideTopChart
+          embedded
         />
       </div>
     </div>
