@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import CondOrb from "../components/condition/CondOrb.jsx";
 import { addCalendarMonths, clampMonth } from "../lib/stepsDisplay.js";
 import { useIsMobile } from "../hooks/useIsMobile.js";
@@ -50,19 +51,36 @@ export default function ConditionTab({
   });
 
   if (openRec) {
-    return (
-      <ConditionRecordScreen
-        v2={v2}
-        onClose={() => { setOpenRec(false); setEditDate(null); }}
-        onSubmit={(payload) => {
-          onSaveConditionDay(payload);
-          setOpenRec(false);
-          setEditDate(null);
+    const node = (
+      <div
+        style={{
+          position: "fixed",
+          inset: 0,
+          zIndex: 80,
+          background: "var(--bg)",
+          overflowY: "auto",
+          WebkitOverflowScrolling: "touch",
         }}
-        initialDate={initialDate}
-        editDate={editDate}
-      />
+      >
+        <ConditionRecordScreen
+          v2={v2}
+          onClose={() => { setOpenRec(false); setEditDate(null); }}
+          onSubmit={(payload) => {
+            onSaveConditionDay(payload);
+            setOpenRec(false);
+            setEditDate(null);
+          }}
+          initialDate={initialDate}
+          editDate={editDate}
+        />
+      </div>
     );
+    // This tab is also embedded inside KokoroTab; portal to body so the record
+    // screen behaves like other tabs (full-screen) instead of expanding inline.
+    if (typeof document !== "undefined" && document.body) {
+      return createPortal(node, document.body);
+    }
+    return node;
   }
 
   return (
