@@ -3,6 +3,7 @@ import { formatExerciseLine, formatRepsForDisplay } from "../lib/format.js";
 import { addCalendarMonths, clampMonth } from "../lib/stepsDisplay.js";
 import { useIsMobile } from "../hooks/useIsMobile.js";
 import MobileFab from "../components/ui/MobileFab.jsx";
+import TrainingMonthCalendar from "../components/training/TrainingMonthCalendar.jsx";
 
 const FILTERS = [
   { key: "all", label: "全て" },
@@ -191,6 +192,17 @@ export default function TrainingTab({
           →
         </button>
       </div>
+
+      <TrainingMonthCalendar
+        ym={viewMonth}
+        todayIso={today}
+        summaryByDate={summaryByDate}
+        onSelectDate={(ds) => {
+          setEditDate(ds);
+          setInitialDate(ds);
+          setOpenRec(true);
+        }}
+      />
 
       <div style={{ display: "flex", gap: 6, padding: "10px 24px", overflowX: "auto" }}>
         {FILTERS.map(f => (
