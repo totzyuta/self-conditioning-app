@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { fmtDate, todayISO } from "../lib/format.js";
+import { useIsMobile } from "../hooks/useIsMobile.js";
 import {
   addCalendarMonths,
   clampMonth,
@@ -9,6 +10,7 @@ import {
 } from "../lib/stepsDisplay.js";
 import StepsChartCard from "../components/steps/StepsChartCard.jsx";
 import StepsRecordScreen from "../components/steps/StepsRecordScreen.jsx";
+import MobileFab from "../components/ui/MobileFab.jsx";
 
 function monthLabel(ym) {
   const [y, m] = ym.split("-");
@@ -16,6 +18,7 @@ function monthLabel(ym) {
 }
 
 export default function StepsTab({ v2, onSaveStepsDay }) {
+  const isMobile = useIsMobile(520);
   const [openRec, setOpenRec] = useState(false);
   const [editDate, setEditDate] = useState(null);
   const [initialDate, setInitialDate] = useState(todayISO());
@@ -75,18 +78,20 @@ export default function StepsTab({ v2, onSaveStepsDay }) {
         <h2 style={{ fontSize: 13, fontWeight: 600, letterSpacing: ".05em" }}>歩数</h2>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <span style={{ fontSize: 11, color: "var(--muted)" }}>{tableRows.length} 日</span>
-          <button
-            type="button"
-            onClick={() => { setEditDate(null); setInitialDate(todayISO()); setOpenRec(true); }}
-            style={{
-              background: "var(--terra)", color: "#fff", border: "none",
-              padding: "8px 12px", borderRadius: 9, fontSize: 11, fontWeight: 700,
-              letterSpacing: ".06em", boxShadow: "0 3px 14px rgba(196,97,58,.22)",
-            }}
-            title="歩数を記録"
-          >
-            記録する
-          </button>
+          {!isMobile && (
+            <button
+              type="button"
+              onClick={() => { setEditDate(null); setInitialDate(todayISO()); setOpenRec(true); }}
+              style={{
+                background: "var(--terra)", color: "#fff", border: "none",
+                padding: "8px 12px", borderRadius: 9, fontSize: 11, fontWeight: 700,
+                letterSpacing: ".06em", boxShadow: "0 3px 14px rgba(196,97,58,.22)",
+              }}
+              title="歩数を記録"
+            >
+              記録する
+            </button>
+          )}
         </div>
       </div>
 
@@ -237,6 +242,12 @@ export default function StepsTab({ v2, onSaveStepsDay }) {
           </tbody>
         </table>
       </div>
+
+      <MobileFab
+        hidden={!isMobile}
+        onClick={() => { setEditDate(null); setInitialDate(todayISO()); setOpenRec(true); }}
+        title="歩数を記録"
+      />
     </div>
   );
 }
