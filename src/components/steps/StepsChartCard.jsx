@@ -2,6 +2,7 @@ import React, { useMemo, useRef, useState } from "react";
 import BarChart from "../charts/BarChart.jsx";
 import { PERIODS } from "../condition/chartConstants.js";
 import { fmtDate } from "../../lib/format.js";
+import { displayStepsValue, localDatesAscEndingTodayInclusive } from "../../lib/stepsDisplay.js";
 import { useIsMobile } from "../../hooks/useIsMobile.js";
 import { useElementWidth } from "../../hooks/useElementWidth.js";
 
@@ -24,18 +25,23 @@ export default function StepsChartCard({ v2, defaultPeriod = "1m", height = 140 
   const chartW = wrapW ? Math.max(320, Math.min(700, Math.round(wrapW))) : 640;
 
   const periodDays = PERIODS.find(p => p.key === period)?.days ?? 30;
-  const cutoff = Date.now() - periodDays * 86400000;
 
-  const chartPoints = useMemo(() => {
-    return Object.entries(v2.stepsByDate || {})
-      .filter(([d, row]) => row && row.steps != null && new Date(`${d}T00:00:00`).getTime() >= cutoff)
-      .map(([d, row]) => ({
+  const { chartPoints, recordedDaysInPeriod } = useMemo(() => {
+    const by = v2.stepsByDate || {};
+    const dates = localDatesAscEndingTodayInclusive(periodDays);
+    let recorded = 0;
+    const pts = dates.map((d) => {
+      const row = by[d];
+      if (row && row.steps != null) recorded += 1;
+      const y = displayStepsValue(row);
+      return {
         x: new Date(`${d}T00:00:00`).getTime(),
-        y: Number(row.steps),
+        y,
         label: fmtDate(d).short,
-      }))
-      .sort((a, b) => a.x - b.x);
-  }, [v2, cutoff]);
+      };
+    });
+    return { chartPoints: pts, recordedDaysInPeriod: recorded };
+  }, [v2, periodDays]);
 
   const ys = chartPoints.map(p => p.y);
   const avg = ys.length ? Math.round(ys.reduce((a, b) => a + b, 0) / ys.length) : null;
@@ -76,7 +82,7 @@ export default function StepsChartCard({ v2, defaultPeriod = "1m", height = 140 
       </div>
 
       <div ref={chartWrapRef}>
-        {chartPoints.length >= 2 ? (
+        {chartPoints.length >= 1 ? (
           <>
             <BarChart
               points={chartPoints}
@@ -99,7 +105,7 @@ export default function StepsChartCard({ v2, defaultPeriod = "1m", height = 140 
                 { label: "平均", val: avg != null ? `${avg.toLocaleString()}` : "—" },
                 { label: "最高", val: maxV != null ? `${maxV.toLocaleString()}` : "—" },
                 { label: "最低", val: minV != null ? `${minV.toLocaleString()}` : "—" },
-                { label: "記録", val: ys.length },
+                { label: "記録", val: recordedDaysInPeriod },
               ].map((s, i) => (
                 <div
                   key={s.label}
@@ -120,7 +126,7 @@ export default function StepsChartCard({ v2, defaultPeriod = "1m", height = 140 
           </>
         ) : (
           <div style={{ textAlign: "center", padding: "32px 0", color: "var(--muted)", fontSize: 12 }}>
-            この期間の歩数データがありません
+            この期間のデータを表示できません
           </div>
         )}
       </div>

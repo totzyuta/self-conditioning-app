@@ -162,13 +162,13 @@ export default function ConditionTab({
         </div>
       </div>
 
-      <div style={{ overflowX: "auto", padding: "12px 24px 0" }}>
-        <table style={{ minWidth: 520 }}>
+      <div style={{ padding: "12px 24px 0" }}>
+        <table style={{ width: "100%", tableLayout: "fixed" }}>
           <thead>
             <tr>
               <th style={{ width: 64 }}>日付</th>
               <th style={{ width: 52 }}>スコア</th>
-              <th style={{ minWidth: 200 }}>コンディションメモ</th>
+              <th>コンディションメモ</th>
             </tr>
           </thead>
           <tbody>
