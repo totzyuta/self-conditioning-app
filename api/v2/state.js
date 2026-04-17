@@ -4,6 +4,8 @@ import { checkSyncAuth } from "../lib/syncAuth.js";
 function json(res, status, body) {
   res.statusCode = status;
   res.setHeader("Content-Type", "application/json; charset=utf-8");
+  // Safety: never cache sync API responses. Stale JSON can cause state rollback.
+  res.setHeader("Cache-Control", "no-store");
   res.end(JSON.stringify(body));
 }
 
@@ -47,6 +49,7 @@ export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET,PUT,DELETE,OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, x-sync-password");
+  res.setHeader("Cache-Control", "no-store");
 
   if (req.method === "OPTIONS") {
     res.statusCode = 204;
