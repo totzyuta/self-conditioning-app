@@ -1,5 +1,14 @@
 import React from "react";
 
+/** 旧クライアントやエッジケースで出る無意味な文言を置き換え */
+function syncErrLabel(err) {
+  const s = String(err ?? "").trim();
+  if (s === "HTTP 200") {
+    return "HTTP 200 は「成功ステータスだが、同期用の JSON（{ ok: true, … }）ではない」ときに出ます。iOS では VITE_API_BASE_URL を本番 API のオリジン（末尾スラッシュなし）に設定して npm run build → npx cap sync ios してください。";
+  }
+  return s;
+}
+
 export default function UserTab({ syncUserId, syncErr, onLogout, onOpenSettings }) {
   return (
     <div className="fade-up" style={{ padding: "24px 24px 56px" }}>
@@ -31,7 +40,7 @@ export default function UserTab({ syncUserId, syncErr, onLogout, onOpenSettings 
           fontSize: 12,
           lineHeight: 1.5,
         }}>
-          同期エラー: {String(syncErr)}
+          同期エラー: {syncErrLabel(syncErr)}
         </div>
       )}
 
