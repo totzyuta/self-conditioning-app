@@ -107,5 +107,7 @@ function faviconIcoFromSvg() {
 }
 
 export default defineConfig({
+  // Capacitor loads `index.html` from the app bundle; relative asset URLs are required.
+  base: "./",
   plugins: [react(), localApiBridge(), faviconIcoFromSvg()],
 });

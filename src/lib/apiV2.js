@@ -1,5 +1,7 @@
+import { apiUrl } from "./apiBase.js";
+
 export async function fetchRemoteStateV2(userId, password) {
-  const res = await fetch(`/api/v2/state?user_id=${encodeURIComponent(userId)}`, {
+  const res = await fetch(apiUrl(`/api/v2/state?user_id=${encodeURIComponent(userId)}`), {
     cache: "no-store",
     headers: { "x-sync-password": password },
   });
@@ -22,7 +24,7 @@ export async function putRemoteDayV2({
   items,
   clientLast,
 }) {
-  const res = await fetch(`/api/v2/state?user_id=${encodeURIComponent(userId)}`, {
+  const res = await fetch(apiUrl(`/api/v2/state?user_id=${encodeURIComponent(userId)}`), {
     method: "PUT",
     cache: "no-store",
     headers: {
@@ -53,7 +55,7 @@ export async function putRemoteDayV2({
 }
 
 export async function wipeRemoteStateV2(userId, password) {
-  const res = await fetch(`/api/v2/state?user_id=${encodeURIComponent(userId)}`, {
+  const res = await fetch(apiUrl(`/api/v2/state?user_id=${encodeURIComponent(userId)}`), {
     method: "DELETE",
     cache: "no-store",
     headers: { "x-sync-password": password },

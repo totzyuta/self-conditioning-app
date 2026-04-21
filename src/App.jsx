@@ -36,6 +36,8 @@ import BottomNav, { BOTTOM_NAV_TOTAL_PX } from "./components/layout/BottomNav.js
 import SettingsSheet from "./components/layout/SettingsSheet.jsx";
 import UpdateAvailableBar from "./components/layout/UpdateAvailableBar.jsx";
 import AppFooterMark from "./components/layout/AppFooterMark.jsx";
+import { Capacitor } from "@capacitor/core";
+import { runHealthKitImport } from "./lib/healthKitSync.js";
 
 export default function App() {
   const sessionInit = readSession();
@@ -52,6 +54,8 @@ export default function App() {
     } catch {}
     return emptyV2State(s.userId);
   });
+  const v2Ref = useRef(v2);
+  v2Ref.current = v2;
   const daySummaries = useMemo(() => daySummariesFromV2(v2), [v2]);
   const [syncErr, setSyncErr] = useState(null);
   /** 全画面ブロックは「シードデータにリセット」実行中のみ */
@@ -163,17 +167,28 @@ export default function App() {
       try {
         const remote = await fetchRemoteStateV2(syncUserId, syncPassword);
         if (cancelled) return;
-        setV2(buildV2StateFromRemote(remote));
+        const fresh = buildV2StateFromRemote(remote);
+        setV2(fresh);
+        await runHealthKitImport({
+          baseV2: fresh,
+          getV2: () => v2Ref.current,
+          setV2,
+          syncUserId,
+          syncPassword,
+          setSyncErr,
+          refetchRemoteV2,
+        });
       } catch (e) {
         if (!cancelled) setSyncErr(e?.message || "sync failed");
       }
     })();
     return () => { cancelled = true; };
-  }, [authed, syncUserId, syncPassword]);
+  }, [authed, syncUserId, syncPassword, refetchRemoteV2]);
 
   // v2 writes are done per-day by update handlers (no bulk push-on-change here).
 
   useEffect(() => {
+    if (Capacitor.isNativePlatform()) return;
     if (!("serviceWorker" in navigator)) return;
 
     navigator.serviceWorker.register("/sw.js").then((reg) => {
