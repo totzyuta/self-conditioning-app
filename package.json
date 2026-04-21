@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "vite build",
+    "cap:sync": "npm run build && npx cap sync ios",
     "dev": "vite",
     "dev:vite": "vite --port $PORT",
     "dev:vercel": "vercel dev",
@@ -13,11 +14,14 @@
     "db:dump:prod": "bash scripts/dump-prod-db.sh"
   },
   "dependencies": {
+    "@capacitor/core": "^8.3.1",
+    "@capacitor/ios": "^8.3.1",
     "@supabase/supabase-js": "^2.103.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.3.1",
     "@types/react": "^18.3.5",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",
