@@ -1,9 +1,10 @@
 {
-  "name": "self-conditioning-app",
+  "name": "ond-app",
   "version": "1.0.1",
-  "description": "Personal fitness and conditioning tracker",
+  "description": "ond — personal health log",
   "type": "module",
   "scripts": {
+    "brand:raster": "node scripts/raster-ond-assets.mjs",
     "build": "vite build",
     "cap:sync": "npm run build && npx cap sync ios",
     "dev": "vite",
@@ -25,6 +26,7 @@
     "@types/react": "^18.3.5",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",
+    "sharp": "^0.34.5",
     "typescript": "^5.4.5",
     "vercel": "^51.2.1",
     "vite": "^5.2.10"

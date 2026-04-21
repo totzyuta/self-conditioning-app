@@ -7,7 +7,7 @@ export default function AppFooterMark({ version }) {
       borderTop: "1px solid var(--border)",
       fontSize: 9, color: "#D0CDC5", letterSpacing: ".15em",
     }}>
-      SELF CONDITIONING APP  ·  {version}
+      ond  ·  {version}
     </footer>
   );
 }

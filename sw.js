@@ -1,8 +1,8 @@
 // NOTE:
 // - API 応答をキャッシュすると「保存→少し後に古い GET が返って state が巻き戻る」事故が起きる。
 // - キャッシュは静的アセット専用にする（/api/* は network-only）。
-const CACHE_VERSION = '1.0.2';
-const CACHE_NAME = `self-conditioning-v2-cache-${CACHE_VERSION}`;
+const CACHE_VERSION = '1.0.3';
+const CACHE_NAME = `ond-v2-cache-${CACHE_VERSION}`;
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
