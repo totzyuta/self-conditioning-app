@@ -1,5 +1,6 @@
 /**
  * Rasterize ond SVGs for iOS AppIcon, Splash, header asset catalog, and PWA PNGs.
+ * AppIcon source (public/brand/AppIcon-1024.svg) uses the primary gradient mark for store / PWA / apple-touch icons.
  * Run from repo root: node scripts/raster-ond-assets.mjs
  */
 import fs from "node:fs";
