@@ -36,11 +36,15 @@ import BottomNav, { BOTTOM_NAV_TOTAL_PX } from "./components/layout/BottomNav.js
 import SettingsSheet from "./components/layout/SettingsSheet.jsx";
 import UpdateAvailableBar from "./components/layout/UpdateAvailableBar.jsx";
 import AppFooterMark from "./components/layout/AppFooterMark.jsx";
+import { App as CapacitorApp } from "@capacitor/app";
 import { Capacitor } from "@capacitor/core";
 import { runHealthKitImport } from "./lib/healthKitSync.js";
 import { NativeChrome } from "./plugins/nativeChrome.js";
 
 const USE_IOS_NATIVE_CHROME = Capacitor.isNativePlatform() && Capacitor.getPlatform() === "ios";
+
+/** Throttle HealthKit import on resume / steps tab (ms). */
+const HEALTH_KIT_IMPORT_THROTTLE_MS = 4 * 60 * 1000;
 
 export default function App() {
   const sessionInit = readSession();
@@ -162,6 +166,24 @@ export default function App() {
     setV2(buildV2StateFromRemote(remote));
   }, [syncUserId, syncPassword]);
 
+  const healthKitImportThrottleAtRef = useRef(0);
+
+  const requestThrottledHealthKitImport = useCallback(async () => {
+    if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== "ios") return;
+    if (!authed || !syncUserId || !syncPassword) return;
+    const now = Date.now();
+    if (now - healthKitImportThrottleAtRef.current < HEALTH_KIT_IMPORT_THROTTLE_MS) return;
+    healthKitImportThrottleAtRef.current = now;
+    await runHealthKitImport({
+      getV2: () => v2Ref.current,
+      setV2,
+      syncUserId,
+      syncPassword,
+      setSyncErr,
+      refetchRemoteV2,
+    });
+  }, [authed, syncUserId, syncPassword, setSyncErr, refetchRemoteV2]);
+
   useEffect(() => {
     if (!authed || !syncUserId || !syncPassword) return;
     let cancelled = false;
@@ -181,12 +203,32 @@ export default function App() {
           setSyncErr,
           refetchRemoteV2,
         });
+        healthKitImportThrottleAtRef.current = Date.now();
       } catch (e) {
         if (!cancelled) setSyncErr(e?.message || "sync failed");
       }
     })();
     return () => { cancelled = true; };
   }, [authed, syncUserId, syncPassword, refetchRemoteV2]);
+
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== "ios") return;
+    let cancelled = false;
+    let handle;
+    CapacitorApp.addListener("resume", () => {
+      void requestThrottledHealthKitImport();
+    }).then((h) => {
+      if (cancelled) {
+        h.remove();
+      } else {
+        handle = h;
+      }
+    });
+    return () => {
+      cancelled = true;
+      handle?.remove();
+    };
+  }, [requestThrottledHealthKitImport]);
 
   // v2 writes are done per-day by update handlers (no bulk push-on-change here).
 
@@ -660,6 +702,7 @@ export default function App() {
             key="steps"
             v2={v2}
             onSaveStepsDay={saveStepsDay}
+            requestHealthKitImport={requestThrottledHealthKitImport}
           />
         )}
         {tab === "weight" && (

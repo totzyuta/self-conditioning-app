@@ -17,7 +17,7 @@ function monthLabel(ym) {
   return `${y}年${parseInt(m, 10)}月`;
 }
 
-export default function StepsTab({ v2, onSaveStepsDay }) {
+export default function StepsTab({ v2, onSaveStepsDay, requestHealthKitImport }) {
   const isMobile = useIsMobile(520);
   const [openRec, setOpenRec] = useState(false);
   const [editDate, setEditDate] = useState(null);
@@ -33,6 +33,11 @@ export default function StepsTab({ v2, onSaveStepsDay }) {
   useEffect(() => {
     setViewMonth((prev) => clampMonth(prev, minMonth, maxMonth));
   }, [minMonth, maxMonth]);
+
+  useEffect(() => {
+    if (typeof requestHealthKitImport !== "function") return;
+    void requestHealthKitImport();
+  }, [requestHealthKitImport]);
 
   const tableRows = useMemo(() => {
     const t = todayISO();
