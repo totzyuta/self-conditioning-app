@@ -18,6 +18,9 @@
 		7E1F2A401FED796500168510 /* HealthKitBridgePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1F2A3E1FED796500168510 /* HealthKitBridgePlugin.swift */; };
 		7E1F2A411FED796500168510 /* HealthKitBridgePlugin.m in Sources */ = {isa = PBXBuildFile; fileRef = 7E1F2A3F1FED796500168510 /* HealthKitBridgePlugin.m */; };
 		7E1F2A421FED796500168510 /* HealthKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7E1F2A431FED796500168510 /* HealthKit.framework */; };
+		A1B2C3D11FED796500168601 /* ConditioningChromeViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D01FED796500168601 /* ConditioningChromeViewController.swift */; };
+		A1B2C3D31FED796500168602 /* NativeChromePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D21FED796500168602 /* NativeChromePlugin.swift */; };
+		A1B2C3D51FED796500168603 /* NativeChromePlugin.m in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D41FED796500168603 /* NativeChromePlugin.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -35,6 +38,9 @@
 		7E1F2A431FED796500168510 /* HealthKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = HealthKit.framework; path = System/Library/Frameworks/HealthKit.framework; sourceTree = SDKROOT; };
 		7E1F2A441FED796500168510 /* App.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = App.entitlements; sourceTree = "<group>"; };
 		958DCC722DB07C7200EA8C5F /* debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = debug.xcconfig; path = ../debug.xcconfig; sourceTree = SOURCE_ROOT; };
+		A1B2C3D01FED796500168601 /* ConditioningChromeViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConditioningChromeViewController.swift; sourceTree = "<group>"; };
+		A1B2C3D21FED796500168602 /* NativeChromePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeChromePlugin.swift; sourceTree = "<group>"; };
+		A1B2C3D41FED796500168603 /* NativeChromePlugin.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = NativeChromePlugin.m; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -76,6 +82,9 @@
 				504EC3071FED79650016851F /* AppDelegate.swift */,
 				7E1F2A3E1FED796500168510 /* HealthKitBridgePlugin.swift */,
 				7E1F2A3F1FED796500168510 /* HealthKitBridgePlugin.m */,
+				A1B2C3D01FED796500168601 /* ConditioningChromeViewController.swift */,
+				A1B2C3D21FED796500168602 /* NativeChromePlugin.swift */,
+				A1B2C3D41FED796500168603 /* NativeChromePlugin.m */,
 				504EC30B1FED79650016851F /* Main.storyboard */,
 				504EC30E1FED79650016851F /* Assets.xcassets */,
 				504EC3101FED79650016851F /* LaunchScreen.storyboard */,
@@ -179,6 +188,9 @@
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
 				7E1F2A401FED796500168510 /* HealthKitBridgePlugin.swift in Sources */,
 				7E1F2A411FED796500168510 /* HealthKitBridgePlugin.m in Sources */,
+				A1B2C3D11FED796500168601 /* ConditioningChromeViewController.swift in Sources */,
+				A1B2C3D31FED796500168602 /* NativeChromePlugin.swift in Sources */,
+				A1B2C3D51FED796500168603 /* NativeChromePlugin.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -333,6 +345,7 @@
 				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 29XC2WXEKP;
 				INFOPLIST_FILE = App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -356,6 +369,7 @@
 				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 29XC2WXEKP;
 				INFOPLIST_FILE = App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = (

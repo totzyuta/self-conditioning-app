@@ -38,6 +38,9 @@ import UpdateAvailableBar from "./components/layout/UpdateAvailableBar.jsx";
 import AppFooterMark from "./components/layout/AppFooterMark.jsx";
 import { Capacitor } from "@capacitor/core";
 import { runHealthKitImport } from "./lib/healthKitSync.js";
+import { NativeChrome } from "./plugins/nativeChrome.js";
+
+const USE_IOS_NATIVE_CHROME = Capacitor.isNativePlatform() && Capacitor.getPlatform() === "ios";
 
 export default function App() {
   const sessionInit = readSession();
@@ -207,6 +210,24 @@ export default function App() {
 
       return () => clearInterval(interval);
     });
+  }, []);
+
+  useEffect(() => {
+    if (!USE_IOS_NATIVE_CHROME) return;
+    NativeChrome.setChrome({
+      tab,
+      userId: syncUserId ?? "",
+      visible: authed,
+    }).catch(() => {});
+  }, [tab, syncUserId, authed]);
+
+  useEffect(() => {
+    if (!USE_IOS_NATIVE_CHROME) return;
+    const handle = NativeChrome.addListener("nativeTabSelected", (payload) => {
+      const next = payload?.tab ?? payload;
+      if (typeof next === "string" && next) setTab(next);
+    });
+    return () => handle.remove();
   }, []);
 
   const addLog = useCallback(async (log) => {
@@ -599,11 +620,13 @@ export default function App() {
         </div>
       )}
 
-      <AppHeaderTabs
-        syncUserId={syncUserId}
-      />
+      {!USE_IOS_NATIVE_CHROME && (
+        <AppHeaderTabs
+          syncUserId={syncUserId}
+        />
+      )}
 
-      <main style={{ paddingBottom: BOTTOM_NAV_TOTAL_PX }}>
+      <main style={{ paddingBottom: USE_IOS_NATIVE_CHROME ? 0 : BOTTOM_NAV_TOTAL_PX }}>
         {tab === "kokoro" && (
           <KokoroTab
             key="kokoro"
@@ -657,7 +680,9 @@ export default function App() {
         )}
       </main>
 
-      <BottomNav tab={tab} setTab={setTab} />
+      {!USE_IOS_NATIVE_CHROME && (
+        <BottomNav tab={tab} setTab={setTab} />
+      )}
 
       {showSettings && (
         <SettingsSheet
