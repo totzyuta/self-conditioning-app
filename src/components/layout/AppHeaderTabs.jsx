@@ -10,12 +10,11 @@ export default function AppHeaderTabs({ syncUserId }) {
     }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
         <div style={{ flex: 1, textAlign: "center" }}>
-          <div style={{ fontSize: 9, letterSpacing: ".28em", color: "var(--muted)", textTransform: "uppercase", marginBottom: 3 }}>
-            PERSONAL HEALTH LOG
-          </div>
-          <h1 style={{ fontSize: 17, fontWeight: 300, color: "var(--green)", letterSpacing: ".01em" }}>
-            Self Conditioning App
-          </h1>
+          <img
+            src="/brand/ond-lockup-horizontal.svg"
+            alt="ond"
+            style={{ width: "min(260px, 72vw)", height: "auto", display: "block", margin: "0 auto" }}
+          />
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>

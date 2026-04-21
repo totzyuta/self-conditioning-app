@@ -1,31 +1,31 @@
 {
-  "name": "Self Conditioning App",
-  "short_name": "Conditioning",
-  "description": "Personal fitness and conditioning tracker with daily logs",
+  "name": "ond",
+  "short_name": "ond",
+  "description": "ond — personal health log",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#F9F8F4",
-  "theme_color": "#2D5A27",
+  "theme_color": "#3D5A47",
   "orientation": "portrait-primary",
   "scope": "/",
   "icons": [
     {
-      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect fill='%232D5A27' width='192' height='192'/><text x='50%' y='50%' font-size='96' font-weight='bold' fill='white' text-anchor='middle' dominant-baseline='central' font-family='system-ui'>◆</text></svg>",
+      "src": "/brand/icon-192.png",
       "sizes": "192x192",
-      "type": "image/svg+xml",
+      "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect fill='%232D5A27' width='512' height='512'/><text x='50%' y='50%' font-size='256' font-weight='bold' fill='white' text-anchor='middle' dominant-baseline='central' font-family='system-ui'>◆</text></svg>",
+      "src": "/brand/icon-512.png",
       "sizes": "512x512",
-      "type": "image/svg+xml",
+      "type": "image/png",
       "purpose": "any maskable"
     }
   ],
   "categories": ["health", "fitness"],
   "screenshots": [
     {
-      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 540 720'><rect fill='%23F9F8F4' width='540' height='720'/><text x='50%' y='50%' font-size='48' fill='%232D5A27' text-anchor='middle' dominant-baseline='central'>Conditioning Tracker</text></svg>",
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 540 720'><rect fill='%23F9F8F4' width='540' height='720'/><text x='50%' y='50%' font-size='48' fill='%233D5A47' text-anchor='middle' dominant-baseline='central'>ond</text></svg>",
       "sizes": "540x720",
       "type": "image/svg+xml",
       "form_factor": "narrow"
@@ -33,7 +33,7 @@
   ],
   "shortcuts": [
     {
-      "name": "Record Condition",
+      "name": "Record condition",
       "short_name": "Record",
       "description": "Quickly record today's condition",
       "url": "/?tab=condition",

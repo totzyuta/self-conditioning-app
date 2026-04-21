@@ -7,8 +7,7 @@ final class ConditioningChromeViewController: UIViewController, UITabBarDelegate
     private let bridgeViewController = CAPBridgeViewController()
 
     private let headerContainer = UIView()
-    private let subtitleLabel = UILabel()
-    private let titleLabel = UILabel()
+    private let brandImageView = UIImageView()
     private let userStack = UIStackView()
     private let userIdLabel = UILabel()
     private let activeLabel = UILabel()
@@ -28,7 +27,7 @@ final class ConditioningChromeViewController: UIViewController, UITabBarDelegate
         ("user", "ユーザー", "person.circle.fill"),
     ]
 
-    private static let brandGreen = UIColor(red: 45 / 255, green: 90 / 255, blue: 39 / 255, alpha: 1)
+    private static let brandGreen = UIColor(red: 61 / 255, green: 90 / 255, blue: 71 / 255, alpha: 1)
     private static let bgColor = UIColor(red: 249 / 255, green: 248 / 255, blue: 244 / 255, alpha: 1)
     private static let mutedColor = UIColor(red: 155 / 255, green: 152 / 255, blue: 144 / 255, alpha: 1)
     private static let borderColor = UIColor(red: 228 / 255, green: 225 / 255, blue: 216 / 255, alpha: 1)
@@ -65,15 +64,13 @@ final class ConditioningChromeViewController: UIViewController, UITabBarDelegate
         headerContainer.layer.borderWidth = 1 / UIScreen.main.scale
         headerContainer.layer.borderColor = Self.borderColor.cgColor
 
-        subtitleLabel.text = "PERSONAL HEALTH LOG"
-        subtitleLabel.font = .systemFont(ofSize: 9, weight: .semibold)
-        subtitleLabel.textColor = Self.mutedColor
-        subtitleLabel.textAlignment = .center
-
-        titleLabel.text = "Self Conditioning App"
-        titleLabel.font = .systemFont(ofSize: 17, weight: .light)
-        titleLabel.textColor = Self.brandGreen
-        titleLabel.textAlignment = .center
+        brandImageView.image = UIImage(named: "HeaderLockup")
+        brandImageView.contentMode = .scaleAspectFit
+        brandImageView.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        brandImageView.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            brandImageView.heightAnchor.constraint(equalToConstant: 26),
+        ])
 
         avatarLabel.text = "T"
         avatarLabel.font = .systemFont(ofSize: 12, weight: .bold)
@@ -108,10 +105,10 @@ final class ConditioningChromeViewController: UIViewController, UITabBarDelegate
         userStack.addArrangedSubview(avatarLabel)
         userStack.addArrangedSubview(userTextColumn)
 
-        let titleColumn = UIStackView(arrangedSubviews: [subtitleLabel, titleLabel])
+        let titleColumn = UIStackView(arrangedSubviews: [brandImageView])
         titleColumn.axis = .vertical
         titleColumn.alignment = .center
-        titleColumn.spacing = 3
+        titleColumn.spacing = 0
 
         let topRow = UIStackView(arrangedSubviews: [titleColumn, userStack])
         topRow.axis = .horizontal

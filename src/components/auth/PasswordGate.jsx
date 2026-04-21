@@ -36,13 +36,11 @@ export default function PasswordGate({ onAuth }) {
     }}>
       {/* Brand */}
       <div style={{ textAlign: "center", marginBottom: 48, animation: "fadeDown .5s both" }}>
-        <div style={{
-          fontSize: 9, letterSpacing: ".32em", color: "var(--muted)",
-          textTransform: "uppercase", marginBottom: 10,
-        }}>PERSONAL HEALTH LOG</div>
-        <h1 style={{ fontSize: 22, fontWeight: 200, color: "var(--green)", letterSpacing: ".02em" }}>
-          Self Conditioning App
-        </h1>
+        <img
+          src="/brand/ond-lockup-horizontal.svg"
+          alt="ond"
+          style={{ width: "min(280px, 85vw)", height: "auto", display: "block", margin: "0 auto" }}
+        />
         <div style={{ width: 32, height: 1, background: "var(--border)", margin: "18px auto 0" }} />
       </div>
 

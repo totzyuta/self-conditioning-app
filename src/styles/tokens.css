@@ -1,6 +1,6 @@
 :root {
   --bg: #F9F8F4; --surface: #FFFFFF;
-  --green: #2D5A27; --green-dim: #EAF2E9;
+  --green: #3D5A47; --green-dim: #EAF2E9;
   --terra: #C4613A; --terra-dim: #FBF0EB;
   --text: #1C1C1A; --muted: #9B9890; --border: #E4E1D8;
   /* condColor: 5.0=中立、低→クール(#5A6470)、高→ウォーム(#9D5E4E)。condLabel() 帯は下記の離散色 */
