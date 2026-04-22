@@ -13,14 +13,22 @@
 
 ## API base URL (required for device builds)
 
-The web app calls `/api/v2/state` with a **relative URL**. In the Capacitor bundle there is no origin, so set at **build time**:
+The web app calls `/api/v2/state` with a **relative URL**. In the Capacitor bundle there is no origin, so set at **build time**.
+
+`npm run cap:sync` runs a guard script first: it **fails** if `VITE_API_BASE_URL` is missing, so the bundle never ships with relative-only `/api/...` (which would return HTML and show a sync error in the app).
 
 ```bash
-VITE_API_BASE_URL=https://your-deployment.vercel.app npm run build
-npx cap sync ios
+# One-shot (or put VITE_API_BASE_URL in .env.production / .env.production.local; see .env.example)
+VITE_API_BASE_URL=https://your-deployment.vercel.app npm run cap:sync
 ```
 
-Use your real Vercel (or other) HTTPS origin. CORS on the serverless handler already allows arbitrary origins (`Access-Control-Allow-Origin: *`), which includes Capacitor’s app origin.
+Use your real Vercel (or other) HTTPS origin (no trailing slash). CORS on the serverless handler already allows arbitrary origins (`Access-Control-Allow-Origin: *`), which includes Capacitor’s app origin.
+
+**After changing the base URL or API**, check the live endpoint (same `user_id` and `x-sync-password` as the app):
+
+```bash
+VITE_API_BASE_URL=https://your-deployment.vercel.app SYNC_PASSWORD=... npm run verify:sync-api
+```
 
 ## Authentication
 
@@ -39,7 +47,8 @@ Use your real Vercel (or other) HTTPS origin. CORS on the serverless handler alr
 
 ## Scripts
 
-- `npm run cap:sync` — production web build + `cap sync ios` (copies `dist` into the iOS app).
+- `npm run cap:sync` — require `VITE_API_BASE_URL`, then production build + `cap sync ios` (copies `dist` into the iOS app).
+- `npm run verify:sync-api` — optional: GET `.../api/v2/state?user_id=...` and confirm JSON `{ ok: true }` (set `SYNC_PASSWORD` in the environment or env file; see [`.env.example`](../.env.example)).
 
 ## Xcode: install on your iPhone (development)
 
