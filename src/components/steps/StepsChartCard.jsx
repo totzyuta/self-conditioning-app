@@ -32,7 +32,7 @@ export default function StepsChartCard({ v2, defaultPeriod = "1m", height = 140 
     let recorded = 0;
     const pts = dates.map((d) => {
       const row = by[d];
-      if (row && row.steps != null) recorded += 1;
+      if (displayStepsValue(row) > 0) recorded += 1;
       const y = displayStepsValue(row);
       return {
         x: new Date(`${d}T00:00:00`).getTime(),
