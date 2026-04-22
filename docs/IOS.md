@@ -29,7 +29,8 @@ Use your real Vercel (or other) HTTPS origin. CORS on the serverless handler alr
 ## HealthKit
 
 - **Read only**: body mass (kg) and step count, merged after the first successful remote fetch.
-- **Manual wins**: If the user already entered weight or steps for a day, primary fields stay manual; HealthKit values are stored in **`hkWeight` / `hkSteps`** for that day (local state; not sent as separate columns to the server).
+- **When it runs**: After login’s remote fetch, again when the app **returns to the foreground** (throttled, e.g. about every few minutes at most), and when the user opens the **Steps** tab (same throttle as foreground). This keeps step counts aligned with Apple Health without spamming sync.
+- **Manual wins**: If the user already entered weight or **non-zero** steps for a day, primary fields stay manual; HealthKit values are stored in **`hkWeight` / `hkSteps`** for that day (local state; not sent as separate columns to the server). **Steps stored as `0` are treated as empty** so HealthKit can fill the primary `steps` when Health has data for that day.
 
 ## Xcode / signing
 

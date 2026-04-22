@@ -11,11 +11,13 @@ function hasManualWeight(day) {
 function hasManualSteps(day) {
   if (!day) return false;
   const s = day.steps;
-  return s != null && s !== "" && Number.isFinite(Number(s));
+  if (s == null || s === "" || !Number.isFinite(Number(s))) return false;
+  return Math.trunc(Number(s)) !== 0;
 }
 
 /**
- * Merge HealthKit samples into v2 state. Manual entries win for primary `weight` / `steps`;
+ * Merge HealthKit samples into v2 state. Manual entries win for primary `weight` / `steps`
+ * (steps count `0` is treated as no manual value so HK can fill `steps`);
  * HK-only values go into `hkWeight` / `hkSteps` when manual exists.
  * Returns next state and remote PUT rows for days where primary fields were updated from HK.
  */
