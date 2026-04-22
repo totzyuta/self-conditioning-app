@@ -1,13 +1,34 @@
 /**
  * 歩数タブ: 未入力日は表示上 0 歩。DB / 同期の形は変えない。
+ * 表示は `displayStepsValue`（正の primary 歩数があれば DB 優先、0/未登録は `hkSteps` フォールバック）。
  */
 
-/** @param {{ steps?: number | null, note?: string } | null | undefined} row */
+/**
+ * primary `steps` が「DB で確定した正の歩数」か。これが真のとき HealthKit は primary を上書きせず、表示も primary のみ。
+ * 0・未登録・非数は偽（HK で埋められる枠）。
+ * @param {{ steps?: number | null, hkSteps?: number | null, note?: string } | null | undefined} row
+ */
+export function isUserCommittedStepsFromDb(row) {
+  if (!row) return false;
+  const s = row.steps;
+  if (s == null || s === "" || !Number.isFinite(Number(s))) return false;
+  return Math.trunc(Number(s)) > 0;
+}
+
+/**
+ * 一覧・グラフ用の表示歩数。正の primary があればそれのみ；なければ `hkSteps`、それもなければ primary の 0 または 0。
+ * @param {{ steps?: number | null, hkSteps?: number | null, note?: string } | null | undefined} row
+ */
 export function displayStepsValue(row) {
   if (!row) return 0;
-  if (row.steps != null) {
-    const n = Number(row.steps);
-    return Number.isFinite(n) ? Math.trunc(n) : 0;
+  if (isUserCommittedStepsFromDb(row)) {
+    return Math.trunc(Number(row.steps));
+  }
+  if (row.hkSteps != null && Number.isFinite(Number(row.hkSteps))) {
+    return Math.trunc(Number(row.hkSteps));
+  }
+  if (row.steps != null && Number.isFinite(Number(row.steps))) {
+    return Math.trunc(Number(row.steps));
   }
   return 0;
 }

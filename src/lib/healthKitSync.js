@@ -1,6 +1,7 @@
 import { Capacitor } from "@capacitor/core";
 import { HealthKitBridge } from "../plugins/healthKitBridge.js";
 import { putRemoteDayV2 } from "./apiV2.js";
+import { isUserCommittedStepsFromDb } from "./stepsDisplay.js";
 
 function hasManualWeight(day) {
   if (!day) return false;
@@ -8,16 +9,9 @@ function hasManualWeight(day) {
   return w != null && w !== "" && Number.isFinite(Number(w));
 }
 
-function hasManualSteps(day) {
-  if (!day) return false;
-  const s = day.steps;
-  if (s == null || s === "" || !Number.isFinite(Number(s))) return false;
-  return Math.trunc(Number(s)) !== 0;
-}
-
 /**
  * Merge HealthKit samples into v2 state. Manual entries win for primary `weight` / `steps`
- * (steps count `0` is treated as no manual value so HK can fill `steps`);
+ * Positive primary `steps` use `isUserCommittedStepsFromDb` from `stepsDisplay.js`; 0 or unset lets HK fill `steps`.
  * HK-only values go into `hkWeight` / `hkSteps` when manual exists.
  * Returns next state and remote PUT rows for days where primary fields were updated from HK.
  */
@@ -66,7 +60,7 @@ export function mergeHealthKitIntoV2(prevV2, { weights = [], stepsByDate = [] },
     if (!date || typeof st !== "number" || !Number.isFinite(st)) continue;
     const cur = next.stepsByDate[date] || { steps: null, note: "", updatedAt: null };
     const prevUpdated = cur.updatedAt || null;
-    if (hasManualSteps(cur)) {
+    if (isUserCommittedStepsFromDb(cur)) {
       next.stepsByDate[date] = {
         ...cur,
         hkSteps: Math.trunc(st),

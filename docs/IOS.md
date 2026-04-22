@@ -39,6 +39,7 @@ VITE_API_BASE_URL=https://your-deployment.vercel.app SYNC_PASSWORD=... npm run v
 - **Read only**: body mass (kg) and step count, merged after the first successful remote fetch.
 - **When it runs**: After login’s remote fetch, again when the app **returns to the foreground** (throttled, e.g. about every few minutes at most), and when the user opens the **Steps** tab (same throttle as foreground). This keeps step counts aligned with Apple Health without spamming sync.
 - **Manual wins**: If the user already entered weight or **non-zero** steps for a day, primary fields stay manual; HealthKit values are stored in **`hkWeight` / `hkSteps`** for that day (local state; not sent as separate columns to the server). **Steps stored as `0` are treated as empty** so HealthKit can fill the primary `steps` when Health has data for that day.
+- **Steps display (same rule as merge)**: Charts and the steps list use **`displayStepsValue`**: if primary `steps` is a **positive** integer, show it (DB wins). If primary is **unset or `0`**, show **`hkSteps`** when present, otherwise `0`. This matches merge behaviour: only positive primary steps block HealthKit from overwriting the server-backed `steps` field.
 
 ## Xcode / signing
 
