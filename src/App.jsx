@@ -184,6 +184,21 @@ export default function App() {
     });
   }, [authed, syncUserId, syncPassword, setSyncErr, refetchRemoteV2]);
 
+  /** User-triggered HealthKit import (bypasses throttle used on tab mount / resume). */
+  const requestHealthKitImportNow = useCallback(async () => {
+    if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== "ios") return;
+    if (!authed || !syncUserId || !syncPassword) return;
+    await runHealthKitImport({
+      getV2: () => v2Ref.current,
+      setV2,
+      syncUserId,
+      syncPassword,
+      setSyncErr,
+      refetchRemoteV2,
+    });
+    healthKitImportThrottleAtRef.current = Date.now();
+  }, [authed, syncUserId, syncPassword, setSyncErr, refetchRemoteV2]);
+
   useEffect(() => {
     if (!authed || !syncUserId || !syncPassword) return;
     let cancelled = false;
@@ -703,6 +718,8 @@ export default function App() {
             v2={v2}
             onSaveStepsDay={saveStepsDay}
             requestHealthKitImport={requestThrottledHealthKitImport}
+            onHealthKitManualImport={USE_IOS_NATIVE_CHROME ? requestHealthKitImportNow : undefined}
+            healthKitManualImportReady={Boolean(authed && syncUserId && syncPassword)}
           />
         )}
         {tab === "weight" && (
@@ -710,6 +727,8 @@ export default function App() {
             key="weight"
             v2={v2}
             onSaveWeightDay={saveWeightDay}
+            onHealthKitManualImport={USE_IOS_NATIVE_CHROME ? requestHealthKitImportNow : undefined}
+            healthKitManualImportReady={Boolean(authed && syncUserId && syncPassword)}
           />
         )}
         {tab === "user" && (
