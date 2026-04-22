@@ -17,8 +17,15 @@ function monthLabel(ym) {
   return `${y}年${parseInt(m, 10)}月`;
 }
 
-export default function StepsTab({ v2, onSaveStepsDay, requestHealthKitImport }) {
+export default function StepsTab({
+  v2,
+  onSaveStepsDay,
+  requestHealthKitImport,
+  onHealthKitManualImport,
+  healthKitManualImportReady,
+}) {
   const isMobile = useIsMobile(520);
+  const [hkBusy, setHkBusy] = useState(false);
   const [openRec, setOpenRec] = useState(false);
   const [editDate, setEditDate] = useState(null);
   const [initialDate, setInitialDate] = useState(todayISO());
@@ -99,6 +106,38 @@ export default function StepsTab({ v2, onSaveStepsDay, requestHealthKitImport })
           )}
         </div>
       </div>
+
+      {typeof onHealthKitManualImport === "function" && (
+        <div style={{ padding: "10px 24px 0" }}>
+          <button
+            type="button"
+            disabled={!healthKitManualImportReady || hkBusy}
+            title={healthKitManualImportReady ? "Apple 健康から歩数・体重を取り込みます" : "同期ログインが必要です"}
+            onClick={async () => {
+              setHkBusy(true);
+              try {
+                await onHealthKitManualImport();
+              } finally {
+                setHkBusy(false);
+              }
+            }}
+            style={{
+              background: "var(--surface)",
+              color: healthKitManualImportReady && !hkBusy ? "var(--text)" : "var(--muted)",
+              border: "1px solid var(--border)",
+              padding: "7px 12px",
+              borderRadius: 8,
+              fontSize: 11,
+              fontWeight: 700,
+              letterSpacing: ".04em",
+              cursor: healthKitManualImportReady && !hkBusy ? "pointer" : "not-allowed",
+              opacity: healthKitManualImportReady ? 1 : 0.55,
+            }}
+          >
+            {hkBusy ? "取り込み中…" : "健康から取り込む"}
+          </button>
+        </div>
+      )}
 
       <div style={{ padding: "14px 24px 0" }}>
         <StepsChartCard v2={v2} defaultPeriod="1m" height={140} />
