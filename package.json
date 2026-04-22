@@ -6,7 +6,8 @@
   "scripts": {
     "brand:raster": "node scripts/raster-ond-assets.mjs",
     "build": "vite build",
-    "cap:sync": "npm run build && npx cap sync ios",
+    "cap:sync": "node scripts/ensure-vite-api-base.mjs && npm run build && npx cap sync ios",
+    "verify:sync-api": "node scripts/verify-sync-api.mjs",
     "dev": "vite",
     "dev:vite": "vite --port $PORT",
     "dev:vercel": "vercel dev",
